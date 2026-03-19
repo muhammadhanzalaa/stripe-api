@@ -14,13 +14,10 @@ module.exports = async (req, res) => {
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
       const session = await stripe.checkout.sessions.create({
-        // Yahan humne manually methods define kar diye hain
-        // Note: Apple/Google Pay 'card' ke andar hi aate hain Stripe Checkout mein
-        payment_method_types: ['card'], 
+        // 1. ALL PAYMENT METHODS DEFINED
+        // iDEAL (Netherlands), SEPA (Europe), PayPal, aur Card
+        payment_method_types: ['card', 'paypal', 'ideal', 'sepa_debit'],
         
-        // Agar aapke paas specific local methods hain toh yahan add hotay hain
-        // payment_method_types: ['card', 'alipay'], 
-
         phone_number_collection: { enabled: true },
         line_items: [{
           price_data: {
@@ -31,6 +28,8 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
+        
+        // 2. GLOBAL SHIPPING (SA, OM, Europe, etc.)
         billing_address_collection: 'required',
         shipping_address_collection: {
           allowed_countries: [
@@ -47,7 +46,8 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ url: session.url });
     } catch (err) {
-      return res.status(500).json({ error: err.message });
+      // Agar PayPal ya Bank active nahi hoga dashboard par, toh ye error de sakta hai
+      return res.status(500).json({ error: "Please ensure PayPal/Banks are active in Stripe Dashboard: " + err.message });
     }
   }
 };
