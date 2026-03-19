@@ -14,12 +14,14 @@ module.exports = async (req, res) => {
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
       const session = await stripe.checkout.sessions.create({
-        // 1. Apple/Google Pay & All Dashboard Methods Active
-        automatic_payment_methods: { enabled: true },
+        // Yahan humne manually methods define kar diye hain
+        // Note: Apple/Google Pay 'card' ke andar hi aate hain Stripe Checkout mein
+        payment_method_types: ['card'], 
         
-        // 2. Customer Phone Number Required
-        phone_number_collection: { enabled: true },
+        // Agar aapke paas specific local methods hain toh yahan add hotay hain
+        // payment_method_types: ['card', 'alipay'], 
 
+        phone_number_collection: { enabled: true },
         line_items: [{
           price_data: {
             currency: 'usd',
@@ -29,26 +31,22 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
-        
-        // 3. Address Collection (Saudi, Oman, Europe & Others)
         billing_address_collection: 'required',
         shipping_address_collection: {
           allowed_countries: [
-            'SA', 'OM', 'AE', 'KW', 'QA', 'BH', // Gulf Countries
-            'US', 'CA', 'GB', 'AU', 'NZ', 'PK', 'IN', // Others
+            'SA', 'OM', 'AE', 'KW', 'QA', 'BH', 
+            'US', 'CA', 'GB', 'AU', 'NZ', 'PK', 'IN', 
             'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
             'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
-            'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'NO' // All Europe
+            'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'NO'
           ],
         },
-        
         success_url: 'https://lonovos.com/success',
         cancel_url: 'https://lonovos.com/',
       });
 
       return res.status(200).json({ url: session.url });
     } catch (err) {
-      console.error("Stripe Error:", err.message);
       return res.status(500).json({ error: err.message });
     }
   }
