@@ -14,10 +14,11 @@ module.exports = async (req, res) => {
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
       const session = await stripe.checkout.sessions.create({
-        // Yahan 'card' list kar diya hai taake purana version error na de
+        // 1. Payment Method: 'card' rakhne se error nahi aayega, 
+        // Apple/Google Pay dashboard se handle honge.
         payment_method_types: ['card'],
         
-        // Phone number collection
+        // 2. Phone Number: Customer se mobile number lazmi mangega.
         phone_number_collection: { enabled: true },
 
         line_items: [{
@@ -29,11 +30,14 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
+        
+        // 3. Global Address: Customer ka address mangega.
         billing_address_collection: 'required',
         shipping_address_collection: {
-          // Globally shipping allow karne ke liye main countries add kar di hain
-          allowed_countries: ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'NZ', 'PK', 'IN'],
+          // Ye main countries hain, baki dashboard se global set hoga.
+          allowed_countries: ['US', 'CA', 'GB', 'AU', 'NZ', 'DE', 'FR', 'IT', 'ES', 'PK', 'IN'],
         },
+        
         success_url: 'https://lonovos.com/success',
         cancel_url: 'https://lonovos.com/',
       });
