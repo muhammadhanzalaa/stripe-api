@@ -1,13 +1,13 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 module.exports = async (req, res) => {
-  // 1. CORS Headers (Ye browser ko ijazat denge redirect karne ki)
+  // ZAROORI: Ye headers CORS error khatam karenge
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
-  // Handle OPTIONS request
+  // Preflight request handle karna
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -27,7 +27,7 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
-        success_url: 'https://lonovos.com/',
+        success_url: 'https://lonovos.com/success',
         cancel_url: 'https://lonovos.com/',
       });
       res.status(200).json({ url: session.url });
