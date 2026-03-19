@@ -23,6 +23,6 @@ const session = await stripe.checkout.sessions.create({
       'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'NO'
     ],
   },
-  success_url: 'lonovos.com/pages/thank-you',
+  success_url: 'https://lonovos.com/success',
   cancel_url: 'https://lonovos.com/',
 });
