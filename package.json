@@ -2,6 +2,6 @@
   "name": "stripe-checkout",
   "version": "1.0.0",
   "dependencies": {
-    "stripe": "^14.0.0"
+    "stripe": "^14.21.0"
   }
 }
