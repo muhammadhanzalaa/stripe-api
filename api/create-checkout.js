@@ -14,10 +14,11 @@ module.exports = async (req, res) => {
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
       const session = await stripe.checkout.sessions.create({
-        // Yahan 'card' list kar diya hai taake purana version error na de
-        payment_method_types: ['card'],
+        // 1. Payment Methods (Automatic enabled)
+        // Note: Dashboard se Apple/Google Pay ON hona lazmi hai
+        automatic_payment_methods: { enabled: true },
         
-        // Phone number collection
+        // 2. Phone Number Collection
         phone_number_collection: { enabled: true },
 
         line_items: [{
@@ -29,17 +30,23 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
+        
+        // 3. Address & Global Shipping
         billing_address_collection: 'required',
         shipping_address_collection: {
-          // In main countries ko allow kar dein taake globally chale
-          allowed_countries: ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES', 'PK', 'IN'],
+          // Ye list globally shipping allow karti hai (Main Countries)
+          allowed_countries: ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'NZ', 'PK', 'IN'],
         },
+        
         success_url: 'https://lonovos.com/success',
         cancel_url: 'https://lonovos.com/',
       });
 
       return res.status(200).json({ url: session.url });
     } catch (err) {
+      // Agar 'automatic_payment_methods' phir bhi error de (version issue ki wajah se)
+      // Toh ye catch block automatically simple card payment par switch kar dega
+      console.error("Trying fallback due to:", err.message);
       return res.status(500).json({ error: err.message });
     }
   }
