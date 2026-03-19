@@ -14,19 +14,10 @@ module.exports = async (req, res) => {
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
       const session = await stripe.checkout.sessions.create({
-        // 1. YE SAB SE ZAROORI LINE HAI
-        // Is se Google Pay, Apple Pay aur Bank khud hi active ho jayenge
-        automatic_payment_methods: { 
-          enabled: true 
-        },
+        // 1. Error se bachne ke liye manual list (Bank aur Card)
+        // Note: Google Pay aur Apple Pay 'card' ke andar khud aa jate hain
+        payment_method_types: ['card', 'us_bank_account'],
         
-        // 2. Bank account ke liye extra settings (Agar Dashboard par on hai)
-        payment_method_options: {
-          us_bank_account: {
-            financial_connections: { permissions: ['payment_method'] },
-          },
-        },
-
         phone_number_collection: { enabled: true },
         line_items: [{
           price_data: {
@@ -53,7 +44,8 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ url: session.url });
     } catch (err) {
-      console.error("Final Error:", err.message);
+      // Error message ko console mein dekhne ke liye
+      console.error("Stripe Checkout Error:", err.message);
       return res.status(500).json({ error: err.message });
     }
   }
