@@ -14,10 +14,7 @@ module.exports = async (req, res) => {
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
       const session = await stripe.checkout.sessions.create({
-        // 1. ALL PAYMENT METHODS DEFINED
-        // iDEAL (Netherlands), SEPA (Europe), PayPal, aur Card
-        payment_method_types: ['card', 'paypal', 'ideal', 'sepa_debit'],
-        
+        payment_method_types: ['card'],
         phone_number_collection: { enabled: true },
         line_items: [{
           price_data: {
@@ -28,16 +25,15 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
-        
-        // 2. GLOBAL SHIPPING (SA, OM, Europe, etc.)
         billing_address_collection: 'required',
         shipping_address_collection: {
+          // Ye list itni bari hai ke ye 'Globally' hi count hogi. 
+          // Stripe Dashboard ka 'Address Autocomplete' isi list par kaam karega.
           allowed_countries: [
-            'SA', 'OM', 'AE', 'KW', 'QA', 'BH', 
-            'US', 'CA', 'GB', 'AU', 'NZ', 'PK', 'IN', 
-            'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
-            'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
-            'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'NO'
+            'US', 'CA', 'GB', 'AU', 'NZ', 'AE', 'SA', 'PK', 'IN', 'IE', 'ZA',
+            'AT', 'BE', 'CH', 'DE', 'DK', 'ES', 'FI', 'FR', 'GR', 'HK', 'ID',
+            'IL', 'IT', 'JP', 'KR', 'LU', 'MY', 'NL', 'NO', 'PH', 'PL', 'PT',
+            'SE', 'SG', 'TH', 'TR', 'VN', 'MX', 'BR'
           ],
         },
         success_url: 'https://lonovos.com/success',
@@ -46,8 +42,7 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ url: session.url });
     } catch (err) {
-      // Agar PayPal ya Bank active nahi hoga dashboard par, toh ye error de sakta hai
-      return res.status(500).json({ error: "Please ensure PayPal/Banks are active in Stripe Dashboard: " + err.message });
+      return res.status(500).json({ error: err.message });
     }
   }
 };
