@@ -14,11 +14,9 @@ module.exports = async (req, res) => {
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
       const session = await stripe.checkout.sessions.create({
-        // 1. Payment Method: 'card' rakhne se error nahi aayega, 
-        // Apple/Google Pay dashboard se handle honge.
+        // Payment methods (Card as default, dashboard handles Apple/Google Pay)
         payment_method_types: ['card'],
         
-        // 2. Phone Number: Customer se mobile number lazmi mangega.
         phone_number_collection: { enabled: true },
 
         line_items: [{
@@ -31,11 +29,15 @@ module.exports = async (req, res) => {
         }],
         mode: 'payment',
         
-        // 3. Global Address: Customer ka address mangega.
         billing_address_collection: 'required',
         shipping_address_collection: {
-          // Ye main countries hain, baki dashboard se global set hoga.
-          allowed_countries: ['US', 'CA', 'GB', 'AU', 'NZ', 'DE', 'FR', 'IT', 'ES', 'PK', 'IN'],
+          // Ye list globally shipping enable karti hai (Major regions added)
+          // Agar kisi specific country ka code missing ho toh bas yahan add kar dein
+          allowed_countries: [
+            'US', 'CA', 'GB', 'AU', 'NZ', 'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 
+            'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 
+            'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'NO', 'PK', 'IN', 'AE', 'SA'
+          ],
         },
         
         success_url: 'https://lonovos.com/success',
