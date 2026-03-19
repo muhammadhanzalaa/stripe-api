@@ -14,9 +14,10 @@ module.exports = async (req, res) => {
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
       const session = await stripe.checkout.sessions.create({
-        // Payment methods (Card as default, dashboard handles Apple/Google Pay)
-        payment_method_types: ['card'],
+        // 1. Apple/Google Pay & All Dashboard Methods Active
+        automatic_payment_methods: { enabled: true },
         
+        // 2. Customer Phone Number Required
         phone_number_collection: { enabled: true },
 
         line_items: [{
@@ -29,14 +30,15 @@ module.exports = async (req, res) => {
         }],
         mode: 'payment',
         
+        // 3. Address Collection (Saudi, Oman, Europe & Others)
         billing_address_collection: 'required',
         shipping_address_collection: {
-          // Ye list globally shipping enable karti hai (Major regions added)
-          // Agar kisi specific country ka code missing ho toh bas yahan add kar dein
           allowed_countries: [
-            'US', 'CA', 'GB', 'AU', 'NZ', 'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 
-            'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 
-            'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'NO', 'PK', 'IN', 'AE', 'SA'
+            'SA', 'OM', 'AE', 'KW', 'QA', 'BH', // Gulf Countries
+            'US', 'CA', 'GB', 'AU', 'NZ', 'PK', 'IN', // Others
+            'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
+            'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
+            'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'NO' // All Europe
           ],
         },
         
@@ -46,6 +48,7 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ url: session.url });
     } catch (err) {
+      console.error("Stripe Error:", err.message);
       return res.status(500).json({ error: err.message });
     }
   }
