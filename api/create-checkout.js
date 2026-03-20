@@ -1,7 +1,6 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 module.exports = async (req, res) => {
-  // 1. CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -14,28 +13,22 @@ module.exports = async (req, res) => {
       const { product_name, price } = req.body;
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
-      // 2. Create Stripe Session
       const session = await stripe.checkout.sessions.create({
-        // Yahan humne saare methods manually enable kar diye hain taake Error na aaye
-        // Apple Pay aur Google Pay 'card' ke andar automatically enable hote hain
+        // TEMPORARY FIX: Humne 'paypal' hata diya hai taake error khatam ho jaye.
+        // Jaise hi Stripe dashboard se PayPal on hoga, hum ise wapis add kar denge.
         payment_method_types: [
           'card', 
-          'paypal', 
           'ideal', 
-          'klarna', 
-          'bancontact'
+          'klarna'
         ],
 
-        // Customer Details
         phone_number_collection: { enabled: true },
         billing_address_collection: 'required',
         
         line_items: [{
           price_data: {
             currency: 'usd',
-            product_data: { 
-              name: product_name || "Product",
-            },
+            product_data: { name: product_name || "Product" },
             unit_amount: Math.round(cleanPrice * 100),
           },
           quantity: 1,
@@ -43,24 +36,18 @@ module.exports = async (req, res) => {
         
         mode: 'payment',
         
-        // Shipping details (Middle East, USA, Europe)
         shipping_address_collection: {
           allowed_countries: [
-            'SA', 'OM', 'AE', 'KW', 'QA', 'BH', // Middle East
-            'US', 'CA', 'GB', 'AU', 'NZ', 'PK', 'IN', // Majors
-            'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
-            'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
-            'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'NO' // Europe
+            'SA', 'OM', 'AE', 'KW', 'QA', 'BH', 'US', 'CA', 'GB', 'AU', 'NZ', 'PK', 'IN',
+            'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 
+            'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'NO'
           ],
         },
 
         success_url: 'https://lonovos.com/pages/thank-you',
         cancel_url: 'https://lonovos.com/',
         
-        // Webhook integration ke liye metadata
-        metadata: {
-          product_name: product_name
-        }
+        metadata: { product_name: product_name }
       });
 
       return res.status(200).json({ url: session.url });
