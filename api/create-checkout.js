@@ -1,6 +1,7 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 module.exports = async (req, res) => {
+  // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -10,17 +11,13 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      const { product_name, price } = req.body;
+      // Shopify se bheja gaya naya data (description aur compare_price) yahan receive hoga
+      const { product_name, price, description, compare_price } = req.body;
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
       const session = await stripe.checkout.sessions.create({
-        // TEMPORARY FIX: Humne 'paypal' hata diya hai taake error khatam ho jaye.
-        // Jaise hi Stripe dashboard se PayPal on hoga, hum ise wapis add kar denge.
-        payment_method_types: [
-          'card', 
-          'ideal', 
-          'klarna'
-        ],
+        // PayPal abhi hata diya hai jab tak dashboard se on nahi hota
+        payment_method_types: ['card', 'ideal', 'klarna'], 
 
         phone_number_collection: { enabled: true },
         billing_address_collection: 'required',
@@ -28,7 +25,11 @@ module.exports = async (req, res) => {
         line_items: [{
           price_data: {
             currency: 'usd',
-            product_data: { name: product_name || "Product" },
+            product_data: { 
+              name: product_name || "Product",
+              // Ye description Stripe checkout par product ke niche dikhayi degi
+              description: description || "" 
+            },
             unit_amount: Math.round(cleanPrice * 100),
           },
           quantity: 1,
@@ -47,7 +48,11 @@ module.exports = async (req, res) => {
         success_url: 'https://lonovos.com/pages/thank-you',
         cancel_url: 'https://lonovos.com/',
         
-        metadata: { product_name: product_name }
+        // Metadata zaroori hai Shopify order automation (Webhook) ke liye
+        metadata: {
+          product_name: product_name,
+          bundle_info: description
+        }
       });
 
       return res.status(200).json({ url: session.url });
