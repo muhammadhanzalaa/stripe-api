@@ -12,30 +12,21 @@ module.exports = async (req, res) => {
   if (req.method === 'POST') {
     try {
       const { product_name, price } = req.body;
+      
+      // Price cleaning logic
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
-      // 2. Create Stripe Session
+      // 2. Create Stripe Session with Automatic Payment Methods
       const session = await stripe.checkout.sessions.create({
-        // 'card' ko pehle rakha hai taake Google/Apple Pay priority pe rahein
-        payment_method_types: [
-          'card', 
-          'us_bank_account', 
-          'link', 
-          'cashapp', 
-          'amazon_pay', 
-          'klarna'
-        ],
-
-        payment_method_options: {
-          card: {
-            request_three_d_secure: 'any',
-          },
-          us_bank_account: {
-            financial_connections: { permissions: ['payment_method'] },
-          },
+        // Is line se PayPal, Klarna, aur local methods dashboard se control honge
+        automatic_payment_methods: { 
+          enabled: true 
         },
 
+        // Customer details collection
         phone_number_collection: { enabled: true },
+        billing_address_collection: 'required',
+        
         line_items: [{
           price_data: {
             currency: 'usd',
@@ -48,7 +39,8 @@ module.exports = async (req, res) => {
         }],
         
         mode: 'payment',
-        billing_address_collection: 'required',
+        
+        // Shipping details
         shipping_address_collection: {
           allowed_countries: [
             'SA', 'OM', 'AE', 'KW', 'QA', 'BH', // Middle East
@@ -58,8 +50,14 @@ module.exports = async (req, res) => {
             'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'NO' // Europe
           ],
         },
-        success_url: 'https://lonovos.com/success',
+
+        success_url: 'https://lonovos.com/pages/thank-you',
         cancel_url: 'https://lonovos.com/',
+        
+        // Webhook ke liye metadata (Order sync karne mein madad dega)
+        metadata: {
+          product_name: product_name
+        }
       });
 
       return res.status(200).json({ url: session.url });
