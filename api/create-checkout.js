@@ -12,18 +12,21 @@ module.exports = async (req, res) => {
   if (req.method === 'POST') {
     try {
       const { product_name, price } = req.body;
-      
-      // Price cleaning logic
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
 
-      // 2. Create Stripe Session with Automatic Payment Methods
+      // 2. Create Stripe Session
       const session = await stripe.checkout.sessions.create({
-        // Is line se PayPal, Klarna, aur local methods dashboard se control honge
-        automatic_payment_methods: { 
-          enabled: true 
-        },
+        // Yahan humne saare methods manually enable kar diye hain taake Error na aaye
+        // Apple Pay aur Google Pay 'card' ke andar automatically enable hote hain
+        payment_method_types: [
+          'card', 
+          'paypal', 
+          'ideal', 
+          'klarna', 
+          'bancontact'
+        ],
 
-        // Customer details collection
+        // Customer Details
         phone_number_collection: { enabled: true },
         billing_address_collection: 'required',
         
@@ -40,7 +43,7 @@ module.exports = async (req, res) => {
         
         mode: 'payment',
         
-        // Shipping details
+        // Shipping details (Middle East, USA, Europe)
         shipping_address_collection: {
           allowed_countries: [
             'SA', 'OM', 'AE', 'KW', 'QA', 'BH', // Middle East
@@ -54,7 +57,7 @@ module.exports = async (req, res) => {
         success_url: 'https://lonovos.com/pages/thank-you',
         cancel_url: 'https://lonovos.com/',
         
-        // Webhook ke liye metadata (Order sync karne mein madad dega)
+        // Webhook integration ke liye metadata
         metadata: {
           product_name: product_name
         }
