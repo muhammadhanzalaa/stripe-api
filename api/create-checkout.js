@@ -13,40 +13,44 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, quantity } = req.body;
       const cleanPrice = parseFloat(price);
 
-      // Variants ki formatting (Line by Line)
-      const formattedVariants = variant_name.split(' / ').map(v => `• ${v.trim()}`).join('\n');
-
+      // Saare variants ko array mein convert karna
+      const variantList = variant_name.split(' / ').map(v => v.trim());
+      
       let line_items = [];
 
+      // --- BUNDLE LOGIC (3 Items) ---
       if (quantity === 3) {
         const savingsAmount = cleanPrice.toFixed(2);
 
+        // 1. Paid Items (Pehle 2 Variants yahan show honge)
         line_items.push({
           price_data: {
             currency: 'usd',
             product_data: { 
               name: product_name,
               images: [image_url],
-              description: `SELECTED VARIANTS:\n${formattedVariants}\n\n✅ YOU SAVED: $${savingsAmount}`
+              description: `SELECTED VARIANTS:\n• ${variantList[0] || 'Default'}\n• ${variantList[1] || 'Default'}\n\n✅ YOU SAVED: $${savingsAmount}`
             },
             unit_amount: Math.round(cleanPrice * 100),
           },
           quantity: 2,
         });
 
+        // 2. Free Item (Teesra (3rd) Variant yahan show hoga)
         line_items.push({
           price_data: {
             currency: 'usd',
             product_data: { 
               name: `FREE BUNDLE ITEM (Included)`,
               images: [image_url],
-              description: "Promotion: Buy 2 Get 1 Free Applied"
+              description: `Promotion: Buy 2 Get 1 Free Applied\n• ${variantList[2] || 'Default'}`
             },
             unit_amount: 0,
           },
           quantity: 1,
         });
       } else {
+        // --- NORMAL SINGLE ITEM ---
         line_items.push({
           price_data: {
             currency: 'usd',
