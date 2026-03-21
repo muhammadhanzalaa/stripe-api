@@ -19,19 +19,25 @@ module.exports = async (req, res) => {
       let userCurrency = 'usd';
       let rate = 1;
 
-      // European Union Zone
+      // European Union Zone (Euro)
       const euroZone = ['AT', 'BE', 'CY', 'EE', 'FI', 'FR', 'DE', 'GR', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PT', 'SK', 'SI', 'ES'];
-      // Gulf Countries (GCC)
-      const gulfRates = { 'AE': 3.67, 'SA': 3.75, 'QA': 3.64, 'KW': 0.31, 'OM': 0.38, 'BH': 0.38 };
+      
+      // Gulf Countries (GCC) Rates & Currencies
+      const gulfRates = { 
+        'AE': { currency: 'aed', rate: 3.67 }, 
+        'SA': { currency: 'sar', rate: 3.75 }, 
+        'QA': { currency: 'qar', rate: 3.64 }, 
+        'KW': { currency: 'kwd', rate: 0.31 }, 
+        'OM': { currency: 'omr', rate: 0.38 }, 
+        'BH': { currency: 'bhd', rate: 0.38 } 
+      };
 
       if (euroZone.includes(country)) {
           userCurrency = 'eur';
           rate = 0.92;
       } else if (gulfRates[country]) {
-          // Specific Currencies for Gulf
-          const gulfCurrencies = { 'AE': 'aed', 'SA': 'sar', 'QA': 'qar', 'KW': 'kwd', 'OM': 'omr', 'BH': 'bhd' };
-          userCurrency = gulfCurrencies[country];
-          rate = gulfRates[country];
+          userCurrency = gulfRates[country].currency;
+          rate = gulfRates[country].rate;
       } else if (country === 'GB') {
           userCurrency = 'gbp';
           rate = 0.79;
@@ -44,6 +50,8 @@ module.exports = async (req, res) => {
       const variantList = variant_name.split('|').map(v => v.trim()).filter(v => v !== "");
       
       let line_items = [];
+
+      // --- BUNDLE & SINGLE ITEM LOGIC ---
       if (quantity === 3) {
         line_items.push({
           price_data: {
@@ -56,7 +64,7 @@ module.exports = async (req, res) => {
         line_items.push({
           price_data: {
             currency: userCurrency,
-            product_data: { name: `FREE BUNDLE ITEM`, images: [image_url] },
+            product_data: { name: `FREE BUNDLE ITEM`, images: [image_url], description: `Free Variant: ${variantList[2]}` },
             unit_amount: 0,
           },
           quantity: 1,
@@ -73,21 +81,19 @@ module.exports = async (req, res) => {
       }
 
       const session = await stripe.checkout.sessions.create({
-        // MANUALLY ENABLING BIG LOCAL METHODS
+        // Only active and stable payment methods
         payment_method_types: [
           'card', 
-          'klarna',      // Europe & US (Buy Now Pay Later)
-          'afterpay_clearpay', // UK, US, AU, CA
-          'ideal',       // Netherlands (Very Popular)
-          'bancontact',  // Belgium
-          'eps',         // Austria
-          'giropay',     // Germany
-          'p24',         // Poland
+          'klarna', 
+          'afterpay_clearpay', 
+          'ideal', 
+          'bancontact', 
+          'eps'
         ],
         automatic_tax: { enabled: true },
         line_items: line_items,
         mode: 'payment',
-        // EXTENDED SHIPPING LIST (All Europe + Gulf + Major Markets)
+        // Global Shipping List
         shipping_address_collection: { 
             allowed_countries: [
                 'US', 'CA', 'GB', 'AU', 'DE', 'FR', 'ES', 'IT', 'NL', 'AT', 'BE', 'IE', 'PT', 'SE', 'NO', 'DK', 'FI', 'CH',
