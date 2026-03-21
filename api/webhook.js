@@ -2,14 +2,15 @@ const axios = require('axios');
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 const getRawBody = require('raw-body');
 
-// Vercel config for raw body (Stripe verification ke liye zaroori hai)
+// 1. Config ko upar hi rehne dein
 export const config = {
   api: {
-    bodyParser: false,
+    bodyParser: false, // Stripe signature verification ke liye ye zaroori hai
   },
 };
 
-module.exports = async (req, res) => {
+// 2. Default function export karein
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).send('Method Not Allowed');
   }
@@ -18,23 +19,25 @@ module.exports = async (req, res) => {
   let event;
 
   try {
+    // Raw body ko read karna
     const rawBody = await getRawBody(req);
-    // Stripe se verify karna ke ye real signal hai
+    
+    // Stripe Signature Verify karna
     event = stripe.webhooks.constructEvent(
       rawBody, 
       sig, 
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error("❌ Webhook Error:", err.message);
+    console.error("❌ Webhook Signature Error:", err.message);
+    // Agar signature galat hai toh 400 bhejte hain
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // Jab payment successfully complete ho jaye
+  // 3. Payment Successful Logic
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
 
-    // Shopify Order ka Data taiyar karna
     const orderData = {
       order: {
         line_items: [{
@@ -53,10 +56,9 @@ module.exports = async (req, res) => {
           country: session.shipping_details?.address?.country || "",
           first_name: session.customer_details?.name || "Customer"
         },
-        // Note mein bundle aur variants ki detail ayegi
         note: `Order from Stripe. Variants: ${session.metadata?.variants || "Standard"}`,
         financial_status: "paid",
-        inventory_behaviour: "decrement_ignoring_policy" // Stock manage karne ke liye
+        inventory_behaviour: "decrement_ignoring_policy"
       }
     };
 
@@ -77,9 +79,10 @@ module.exports = async (req, res) => {
       console.log("✅ Shopify Order Created!");
     } catch (err) {
       console.error("❌ Shopify Error:", err.response ? JSON.stringify(err.response.data) : err.message);
+      // Order fail hone par bhi hum Stripe ko 200 bhej sakte hain taake wo bar bar signal na bheje
     }
   }
 
-  // Stripe ko 200 response dena lazmi hai warna wo bar bar bhejta rahega
+  // Stripe ko batana ke signal mil gaya hai
   res.status(200).json({ received: true });
-};
+}
