@@ -11,38 +11,45 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      // Shopify se naya data receive karna
-      const { product_name, variant_name, image_url, price, quantity, description } = req.body;
+      const { product_name, variant_name, image_url, price, quantity } = req.body;
       const cleanPrice = parseFloat(price.toString().replace(/[^\d.]/g, ''));
+
+      // --- FORMATTING LOGIC ---
+      // Variants ko split karke list banana aur Size check karna
+      const formattedVariants = variant_name.split(' / ').map(v => {
+          // Agar size include nahi hai to hum 'None' ya 'Default' handling frontend se karwa sakte hain
+          // Filhal hum ensure kar rahe hain ke layout saaf dikhe
+          return `• ${v.trim()}`;
+      }).join('\n');
 
       let line_items = [];
 
       // --- BUNDLE LOGIC (Buy 2 Get 1 Free) ---
       if (quantity === 3) {
-        // 1. Paid Items (2 Units)
+        const savingsAmount = cleanPrice.toFixed(2);
+
         line_items.push({
           price_data: {
             currency: 'usd',
             product_data: { 
-              name: `${product_name} - ${variant_name}`, // Variant name add kiya
-              images: [image_url], // Image sync ki
-              description: "Main Order Items"
+              name: product_name,
+              images: [image_url],
+              description: `SELECTED VARIANTS:\n${formattedVariants}\n\n✅ YOU SAVED: $${savingsAmount}`
             },
             unit_amount: Math.round(cleanPrice * 100),
           },
           quantity: 2,
         });
 
-        // 2. Free Item (1 Unit)
         line_items.push({
           price_data: {
             currency: 'usd',
             product_data: { 
-              name: `${product_name} - ${variant_name} (FREE BUNDLE ITEM)`,
+              name: `FREE BUNDLE ITEM (Included)`,
               images: [image_url],
-              description: "Buy 2 Get 1 Free Promotion"
+              description: "Promotion: Buy 2 Get 1 Free Applied"
             },
-            unit_amount: 0, // Zero price for free item
+            unit_amount: 0,
           },
           quantity: 1,
         });
@@ -52,9 +59,9 @@ module.exports = async (req, res) => {
           price_data: {
             currency: 'usd',
             product_data: { 
-              name: `${product_name} - ${variant_name}`,
+              name: product_name,
               images: [image_url],
-              description: description || "" 
+              description: `Variant: ${variant_name}`
             },
             unit_amount: Math.round(cleanPrice * 100),
           },
@@ -63,11 +70,10 @@ module.exports = async (req, res) => {
       }
 
       const session = await stripe.checkout.sessions.create({
-        // PayPal baad mein enable karenge dashboard se
         payment_method_types: ['card'], 
         phone_number_collection: { enabled: true },
         billing_address_collection: 'required',
-        line_items: line_items, // Updated line items use kiye
+        line_items: line_items,
         mode: 'payment',
         shipping_address_collection: {
           allowed_countries: [
@@ -80,8 +86,8 @@ module.exports = async (req, res) => {
         cancel_url: 'https://lonovos.com/',
         metadata: {
           product_name: product_name,
-          variant: variant_name, // Webhook ke liye variant save kiya
-          bundle_info: description
+          variant: variant_name,
+          bundle_info: quantity === 3 ? "Buy 2 Get 1 Free" : "Single Pack"
         }
       });
 
