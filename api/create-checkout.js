@@ -13,71 +13,88 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, quantity } = req.body;
       const cleanPrice = parseFloat(price);
 
-      // Frontend se separator '|' use karein taake colors ke andar ke '/' masla na karein
-      // Hum variant_name ko filter kar rahe hain taake empty values na aayein
+      // --- IP BASED LOCATION & CURRENCY ---
+      const country = req.headers['x-vercel-ip-country'] || 'US'; 
+      
+      let userCurrency = 'usd';
+      let rate = 1;
+
+      // European Union Zone
+      const euroZone = ['AT', 'BE', 'CY', 'EE', 'FI', 'FR', 'DE', 'GR', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PT', 'SK', 'SI', 'ES'];
+      // Gulf Countries (GCC)
+      const gulfRates = { 'AE': 3.67, 'SA': 3.75, 'QA': 3.64, 'KW': 0.31, 'OM': 0.38, 'BH': 0.38 };
+
+      if (euroZone.includes(country)) {
+          userCurrency = 'eur';
+          rate = 0.92;
+      } else if (gulfRates[country]) {
+          // Specific Currencies for Gulf
+          const gulfCurrencies = { 'AE': 'aed', 'SA': 'sar', 'QA': 'qar', 'KW': 'kwd', 'OM': 'omr', 'BH': 'bhd' };
+          userCurrency = gulfCurrencies[country];
+          rate = gulfRates[country];
+      } else if (country === 'GB') {
+          userCurrency = 'gbp';
+          rate = 0.79;
+      } else if (country === 'IN') {
+          userCurrency = 'inr';
+          rate = 83;
+      }
+
+      const finalAmount = Math.round(cleanPrice * rate * 100);
       const variantList = variant_name.split('|').map(v => v.trim()).filter(v => v !== "");
       
       let line_items = [];
-
-      // --- BUNDLE LOGIC (Buy 2 Get 1 Free) ---
       if (quantity === 3) {
-        const savingsAmount = cleanPrice.toFixed(2);
-
-        // 1. Paid Items (Pehle 2 selections)
         line_items.push({
           price_data: {
-            currency: 'usd',
-            product_data: { 
-              name: product_name,
-              images: [image_url],
-              description: `SELECTED VARIANTS:\n• ${variantList[0] || 'Selected Color'}\n• ${variantList[1] || 'Selected Color'}\n\n✅ YOU SAVED: $${savingsAmount}`
-            },
-            unit_amount: Math.round(cleanPrice * 100),
+            currency: userCurrency,
+            product_data: { name: product_name, images: [image_url], description: `Variants: ${variantList[0]}, ${variantList[1]}` },
+            unit_amount: finalAmount,
           },
           quantity: 2,
         });
-
-        // 2. Free Item (Teesri selection)
         line_items.push({
           price_data: {
-            currency: 'usd',
-            product_data: { 
-              name: `FREE BUNDLE ITEM (Included)`,
-              images: [image_url],
-              description: `Promotion: Buy 2 Get 1 Free Applied\n• ${variantList[2] || 'Selected Color'}`
-            },
+            currency: userCurrency,
+            product_data: { name: `FREE BUNDLE ITEM`, images: [image_url] },
             unit_amount: 0,
           },
           quantity: 1,
         });
       } else {
-        // --- SINGLE ITEM LOGIC ---
         line_items.push({
           price_data: {
-            currency: 'usd',
-            product_data: { 
-              name: product_name,
-              images: [image_url],
-              description: `Variant: ${variant_name}`
-            },
-            unit_amount: Math.round(cleanPrice * 100),
+            currency: userCurrency,
+            product_data: { name: product_name, images: [image_url], description: `Variant: ${variant_name}` },
+            unit_amount: finalAmount,
           },
           quantity: 1,
         });
       }
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
+        // MANUALLY ENABLING BIG LOCAL METHODS
+        payment_method_types: [
+          'card', 
+          'klarna',      // Europe & US (Buy Now Pay Later)
+          'afterpay_clearpay', // UK, US, AU, CA
+          'ideal',       // Netherlands (Very Popular)
+          'bancontact',  // Belgium
+          'eps',         // Austria
+          'giropay',     // Germany
+          'p24',         // Poland
+        ],
         automatic_tax: { enabled: true },
         line_items: line_items,
         mode: 'payment',
-        // Is mein humne UAE aur Pakistan bhi add kar diye hain testing ke liye
-        shipping_address_collection: { allowed_countries: ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'ES', 'IT', 'NL', 'AE', 'PK'] },
-        // Metadata Shopify order sync ke liye zaroori hai
-        metadata: {
-          full_variants: variant_name,
-          product: product_name
+        // EXTENDED SHIPPING LIST (All Europe + Gulf + Major Markets)
+        shipping_address_collection: { 
+            allowed_countries: [
+                'US', 'CA', 'GB', 'AU', 'DE', 'FR', 'ES', 'IT', 'NL', 'AT', 'BE', 'IE', 'PT', 'SE', 'NO', 'DK', 'FI', 'CH',
+                'AE', 'SA', 'QA', 'KW', 'OM', 'BH', 'IN', 'PK', 'SG', 'MY'
+            ] 
         },
+        metadata: { full_variants: variant_name, product: product_name },
         success_url: 'https://lonovos.com/pages/thank-you',
         cancel_url: 'https://lonovos.com/',
       });
