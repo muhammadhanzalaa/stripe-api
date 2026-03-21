@@ -2,6 +2,8 @@
   "name": "stripe-checkout",
   "version": "1.0.0",
   "dependencies": {
-    "stripe": "^14.21.0"
+    "stripe": "^14.21.0",
+    "axios": "^1.6.0",
+    "raw-body": "^2.5.2"
   }
 }
