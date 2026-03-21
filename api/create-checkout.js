@@ -64,7 +64,7 @@ module.exports = async (req, res) => {
 
       const session = await stripe.checkout.sessions.create({
         // PayPal baad mein enable karenge dashboard se
-        payment_method_types: ['card', 'ideal', 'klarna'], 
+        payment_method_types: ['card'], 
         phone_number_collection: { enabled: true },
         billing_address_collection: 'required',
         line_items: line_items, // Updated line items use kiye
