@@ -13,44 +13,45 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, quantity } = req.body;
       const cleanPrice = parseFloat(price);
 
-      // Saare variants ko array mein convert karna
-      const variantList = variant_name.split(' / ').map(v => v.trim());
+      // Frontend se separator '|' use karein taake colors ke andar ke '/' masla na karein
+      // Hum variant_name ko filter kar rahe hain taake empty values na aayein
+      const variantList = variant_name.split('|').map(v => v.trim()).filter(v => v !== "");
       
       let line_items = [];
 
-      // --- BUNDLE LOGIC (3 Items) ---
+      // --- BUNDLE LOGIC (Buy 2 Get 1 Free) ---
       if (quantity === 3) {
         const savingsAmount = cleanPrice.toFixed(2);
 
-        // 1. Paid Items (Pehle 2 Variants yahan show honge)
+        // 1. Paid Items (Pehle 2 selections)
         line_items.push({
           price_data: {
             currency: 'usd',
             product_data: { 
               name: product_name,
               images: [image_url],
-              description: `SELECTED VARIANTS:\n• ${variantList[0] || 'Default'}\n• ${variantList[1] || 'Default'}\n\n✅ YOU SAVED: $${savingsAmount}`
+              description: `SELECTED VARIANTS:\n• ${variantList[0] || 'Selected Color'}\n• ${variantList[1] || 'Selected Color'}\n\n✅ YOU SAVED: $${savingsAmount}`
             },
             unit_amount: Math.round(cleanPrice * 100),
           },
           quantity: 2,
         });
 
-        // 2. Free Item (Teesra (3rd) Variant yahan show hoga)
+        // 2. Free Item (Teesri selection)
         line_items.push({
           price_data: {
             currency: 'usd',
             product_data: { 
               name: `FREE BUNDLE ITEM (Included)`,
               images: [image_url],
-              description: `Promotion: Buy 2 Get 1 Free Applied\n• ${variantList[2] || 'Default'}`
+              description: `Promotion: Buy 2 Get 1 Free Applied\n• ${variantList[2] || 'Selected Color'}`
             },
             unit_amount: 0,
           },
           quantity: 1,
         });
       } else {
-        // --- NORMAL SINGLE ITEM ---
+        // --- SINGLE ITEM LOGIC ---
         line_items.push({
           price_data: {
             currency: 'usd',
@@ -70,7 +71,13 @@ module.exports = async (req, res) => {
         automatic_tax: { enabled: true },
         line_items: line_items,
         mode: 'payment',
-        shipping_address_collection: { allowed_countries: ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'ES', 'IT', 'NL'] },
+        // Is mein humne UAE aur Pakistan bhi add kar diye hain testing ke liye
+        shipping_address_collection: { allowed_countries: ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'ES', 'IT', 'NL', 'AE', 'PK'] },
+        // Metadata Shopify order sync ke liye zaroori hai
+        metadata: {
+          full_variants: variant_name,
+          product: product_name
+        },
         success_url: 'https://lonovos.com/pages/thank-you',
         cancel_url: 'https://lonovos.com/',
       });
