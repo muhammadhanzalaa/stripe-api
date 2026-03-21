@@ -13,44 +13,45 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, quantity } = req.body;
       const cleanPrice = parseFloat(price);
 
-      // --- IP BASED LOCATION DETECTION ---
+      // --- IP BASED LOCATION & CURRENCY ---
       const country = req.headers['x-vercel-ip-country'] || 'US'; 
       
       let userCurrency = 'usd';
       let rate = 1;
 
-      // 1. Euro Zone (20+ Countries)
-      const euroZone = ['AT', 'BE', 'CY', 'EE', 'FI', 'FR', 'DE', 'GR', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PT', 'SK', 'SI', 'ES', 'HR', 'MC'];
+      // Currency Logic for the specific list
+      const euroZone = ['AT', 'BE', 'FI', 'FR', 'DE', 'IE', 'IT', 'NL', 'PT', 'ES']; // Austria, Belgium, Finland, France, Germany, Ireland, Italy, Netherlands, Portugal, Spain
       
-      // 2. Gulf/Middle East (GCC)
-      const gulfRates = { 
-        'AE': { c: 'aed', r: 3.67 }, 
-        'SA': { c: 'sar', r: 3.75 }, 
-        'QA': { c: 'qar', r: 3.64 }, 
-        'KW': { c: 'kwd', r: 0.31 }, 
-        'OM': { c: 'omr', r: 0.38 }, 
-        'BH': { c: 'bhd', r: 0.38 } 
-      };
-
-      // 3. Logic for Currency Assignment
       if (euroZone.includes(country)) {
           userCurrency = 'eur';
           rate = 0.92;
-      } else if (gulfRates[country]) {
-          userCurrency = gulfRates[country].c;
-          rate = gulfRates[country].r;
       } else if (country === 'GB') {
           userCurrency = 'gbp';
           rate = 0.79;
       } else if (country === 'IN') {
           userCurrency = 'inr';
           rate = 83;
-      } else if (country === 'CA') {
-          userCurrency = 'cad';
-          rate = 1.35;
-      } else if (country === 'AU') {
-          userCurrency = 'aud';
-          rate = 1.52;
+      } else if (country === 'NZ') {
+          userCurrency = 'nzd';
+          rate = 1.65;
+      } else if (country === 'SE') {
+          userCurrency = 'sek';
+          rate = 10.50;
+      } else if (country === 'DK') {
+          userCurrency = 'dkk';
+          rate = 6.85;
+      } else if (country === 'PL') {
+          userCurrency = 'pln';
+          rate = 3.95;
+      } else if (country === 'CH') {
+          userCurrency = 'chf';
+          rate = 0.88;
+      } else if (country === 'KR') {
+          userCurrency = 'krw';
+          rate = 1330;
+      } else if (country === 'BR') {
+          userCurrency = 'brl';
+          rate = 5.00;
       }
 
       const finalAmount = Math.round(cleanPrice * rate * 100);
@@ -90,14 +91,10 @@ module.exports = async (req, res) => {
         automatic_tax: { enabled: true },
         line_items: line_items,
         mode: 'payment',
-        // --- ALLOW SHIPPING TO ALL COUNTRIES ---
-        // 'shipping_address_collection' ko nikaal dein ya niche wali setting use karein
-        // Stripe Checkout mein agar countries list lambi ho jaye to better hai empty rakhein ya 'US' base rakhein
-        // Lekin aap ne 'all countries' manga hai, is liye main ne list expand kar di hai:
+        // --- CLIENT'S SPECIFIC COUNTRY LIST ONLY ---
         shipping_address_collection: { 
             allowed_countries: [
-                'US', 'CA', 'GB', 'AU', 'NZ', 'IE', 'DE', 'FR', 'IT', 'ES', 'NL', 'AT', 'BE', 'CH', 'SE', 'NO', 'DK', 
-                'AE', 'SA', 'QA', 'KW', 'OM', 'BH', 'IN', 'PK', 'SG', 'MY', 'HK', 'JP', 'ZA'
+                'PL', 'AT', 'CH', 'KR', 'BE', 'BR', 'NZ', 'IN', 'FR', 'DE', 'NL', 'ES', 'SE', 'GB', 'DK', 'FI', 'IE', 'IT', 'PT'
             ] 
         },
         metadata: { full_variants: variant_name, product: product_name },
