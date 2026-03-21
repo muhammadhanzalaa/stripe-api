@@ -1,22 +1,40 @@
 const axios = require('axios');
+const stripe = require('stripe')(process.env.STRIPE_SECRET);
+
+// Vercel ke liye raw body parse karna zaroori hai verification ke liye
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+const getRawBody = require('raw-body');
 
 module.exports = async (req, res) => {
   if (req.method === 'POST') {
-    const event = req.body;
+    const sig = req.headers['stripe-signature'];
+    const rawBody = await getRawBody(req);
+
+    let event;
+
+    try {
+      // Ye line verify karti hai ke data Stripe se hi aaya hai
+      event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+      console.error("Webhook Signature Verification Failed:", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
 
       const orderData = {
         order: {
-          line_items: [
-            {
-              // create-checkout.js mein jo metadata bheja tha wahi yahan use karna hai
-              title: session.metadata.product || "Stripe Order", 
-              price: (session.amount_total / 100).toFixed(2),
-              quantity: 1
-            }
-          ],
+          line_items: [{
+            title: session.metadata.product || "Stripe Order",
+            price: (session.amount_total / 100).toFixed(2),
+            quantity: 1
+          }],
           customer: {
             email: session.customer_details.email,
             first_name: session.customer_details.name || "Customer"
@@ -28,23 +46,26 @@ module.exports = async (req, res) => {
             country: session.shipping_details?.address?.country || "",
             first_name: session.customer_details.name || "Customer"
           },
-          // Variants ko notes mein daal rahe hain taake admin dekh sake
           note: `Selected Variants: ${session.metadata.full_variants || "None"}`,
           financial_status: "paid"
         }
       };
 
       try {
-        const shopifyUrl = process.env.SHOPIFY_STORE_URL.includes('myshopify.com') 
-          ? process.env.SHOPIFY_STORE_URL 
+        const shopifyUrl = process.env.SHOPIFY_STORE_URL.includes('myshopify.com')
+          ? process.env.SHOPIFY_STORE_URL
           : `${process.env.SHOPIFY_STORE_URL}.myshopify.com`;
+
+        // YAHAN CHECK KAREIN: Vercel mein variable ka naam kya hai? 
+        // Agar SHOPIFY_CLIENT_SECRET hai toh wahi likhein.
+        const token = process.env.SHOPIFY_CLIENT_SECRET; 
 
         await axios.post(
           `https://${shopifyUrl}/admin/api/2024-01/orders.json`,
           orderData,
           {
             headers: {
-              'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN,
+              'X-Shopify-Access-Token': token,
               'Content-Type': 'application/json'
             }
           }
