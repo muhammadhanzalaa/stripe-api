@@ -34,7 +34,8 @@ module.exports = async (req, res) => {
             product_data: { 
               name: product_name,
               images: [image_url],
-              description: `SELECTED VARIANTS:\n${formattedVariants}\n\n✅ YOU SAVED: $${savingsAmount}`
+              // Backend (GitHub) ke line_items ke andar description aisi honi chahiye:
+description: `SELECTED VARIANTS:\n${variant_name.split(' / ').map(v => `• ${v}`).join('\n')}\n\n✅ YOU SAVED: $${price}`
             },
             unit_amount: Math.round(cleanPrice * 100),
           },
