@@ -2,15 +2,15 @@ const axios = require('axios');
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 const getRawBody = require('raw-body');
 
-// 1. Config ko upar hi rehne dein
-export const config = {
+// 1. Vercel Config (Body parser off karna zaroori hai signature verification ke liye)
+module.exports.config = {
   api: {
-    bodyParser: false, // Stripe signature verification ke liye ye zaroori hai
+    bodyParser: false,
   },
 };
 
-// 2. Default function export karein
-export default async function handler(req, res) {
+// 2. Main Handler Function
+module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).send('Method Not Allowed');
   }
@@ -19,10 +19,10 @@ export default async function handler(req, res) {
   let event;
 
   try {
-    // Raw body ko read karna
+    // Raw body read karna
     const rawBody = await getRawBody(req);
     
-    // Stripe Signature Verify karna
+    // Stripe Signature Verify karna (Webhooks safety ke liye)
     event = stripe.webhooks.constructEvent(
       rawBody, 
       sig, 
@@ -30,11 +30,11 @@ export default async function handler(req, res) {
     );
   } catch (err) {
     console.error("❌ Webhook Signature Error:", err.message);
-    // Agar signature galat hai toh 400 bhejte hain
+    // Agar signature galat ho toh 400 error bhejain
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // 3. Payment Successful Logic
+  // 3. Payment Successful hone par Shopify Order create karna
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
 
@@ -76,13 +76,12 @@ export default async function handler(req, res) {
           }
         }
       );
-      console.log("✅ Shopify Order Created!");
+      console.log("✅ Shopify Order Created Successfully!");
     } catch (err) {
-      console.error("❌ Shopify Error:", err.response ? JSON.stringify(err.response.data) : err.message);
-      // Order fail hone par bhi hum Stripe ko 200 bhej sakte hain taake wo bar bar signal na bheje
+      console.error("❌ Shopify API Error:", err.response ? JSON.stringify(err.response.data) : err.message);
     }
   }
 
-  // Stripe ko batana ke signal mil gaya hai
+  // Stripe ko hamesha 200 Success bhejain taake wo bar bar try na kare
   res.status(200).json({ received: true });
-}
+};
