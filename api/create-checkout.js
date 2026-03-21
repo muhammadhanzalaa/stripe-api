@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
       let rate = 1;
 
       // Currency Logic for the specific list
-      const euroZone = ['AT', 'BE', 'FI', 'FR', 'DE', 'IE', 'IT', 'NL', 'PT', 'ES']; // Austria, Belgium, Finland, France, Germany, Ireland, Italy, Netherlands, Portugal, Spain
+      const euroZone = ['AT', 'BE', 'FI', 'FR', 'DE', 'IE', 'IT', 'NL', 'PT', 'ES']; 
       
       if (euroZone.includes(country)) {
           userCurrency = 'eur';
@@ -34,6 +34,12 @@ module.exports = async (req, res) => {
       } else if (country === 'NZ') {
           userCurrency = 'nzd';
           rate = 1.65;
+      } else if (country === 'AU') { // Australia added
+          userCurrency = 'aud';
+          rate = 1.52;
+      } else if (country === 'CA') { // Canada added
+          userCurrency = 'cad';
+          rate = 1.35;
       } else if (country === 'SE') {
           userCurrency = 'sek';
           rate = 10.50;
@@ -91,10 +97,10 @@ module.exports = async (req, res) => {
         automatic_tax: { enabled: true },
         line_items: line_items,
         mode: 'payment',
-        // --- CLIENT'S SPECIFIC COUNTRY LIST ONLY ---
+        // --- UPDATED SHIPPING COUNTRIES ---
         shipping_address_collection: { 
             allowed_countries: [
-                'PL', 'AT', 'CH', 'KR', 'BE', 'BR', 'NZ', 'IN', 'FR', 'DE', 'NL', 'ES', 'SE', 'GB', 'DK', 'FI', 'IE', 'IT', 'PT'
+                'US', 'CA', 'AU', 'PL', 'AT', 'CH', 'KR', 'BE', 'BR', 'NZ', 'IN', 'FR', 'DE', 'NL', 'ES', 'SE', 'GB', 'DK', 'FI', 'IE', 'IT', 'PT'
             ] 
         },
         metadata: { full_variants: variant_name, product: product_name },
