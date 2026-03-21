@@ -4,39 +4,43 @@ module.exports = async (req, res) => {
   if (req.method === 'POST') {
     const event = req.body;
 
-    // Check karein ke payment success hui hai ya nahi
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
 
-      // Shopify Order Data
       const orderData = {
         order: {
           line_items: [
             {
-              title: session.metadata.product_name || "Stripe Order",
+              // create-checkout.js mein jo metadata bheja tha wahi yahan use karna hai
+              title: session.metadata.product || "Stripe Order", 
               price: (session.amount_total / 100).toFixed(2),
-              quantity: 1,
-              notes: session.metadata.bundle_info || ""
+              quantity: 1
             }
           ],
           customer: {
             email: session.customer_details.email,
             first_name: session.customer_details.name || "Customer"
           },
-          billing_address: {
+          shipping_address: {
             address1: session.shipping_details?.address?.line1 || "",
             city: session.shipping_details?.address?.city || "",
             zip: session.shipping_details?.address?.postal_code || "",
-            country: session.shipping_details?.address?.country || ""
+            country: session.shipping_details?.address?.country || "",
+            first_name: session.customer_details.name || "Customer"
           },
+          // Variants ko notes mein daal rahe hain taake admin dekh sake
+          note: `Selected Variants: ${session.metadata.full_variants || "None"}`,
           financial_status: "paid"
         }
       };
 
       try {
-        // Shopify API ko order bhejna
+        const shopifyUrl = process.env.SHOPIFY_STORE_URL.includes('myshopify.com') 
+          ? process.env.SHOPIFY_STORE_URL 
+          : `${process.env.SHOPIFY_STORE_URL}.myshopify.com`;
+
         await axios.post(
-          `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/orders.json`,
+          `https://${shopifyUrl}/admin/api/2024-01/orders.json`,
           orderData,
           {
             headers: {
