@@ -13,9 +13,52 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, quantity } = req.body;
       const cleanPrice = parseFloat(price);
 
-      // --- SETTING ONLY INDIA & INR ---
-      const userCurrency = 'inr';
-      const rate = 83; // Change to 1 if you want to use the raw price as INR
+      // --- IP BASED LOCATION & CURRENCY ---
+      const country = req.headers['x-vercel-ip-country'] || 'US'; 
+      
+      let userCurrency = 'usd';
+      let rate = 1;
+
+      // Currency Logic for the specific list
+      const euroZone = ['AT', 'BE', 'FI', 'FR', 'DE', 'IE', 'IT', 'NL', 'PT', 'ES']; 
+      
+      if (euroZone.includes(country)) {
+          userCurrency = 'eur';
+          rate = 0.92;
+      } else if (country === 'GB') {
+          userCurrency = 'gbp';
+          rate = 0.79;
+      } else if (country === 'IN') {
+          userCurrency = 'inr';
+          rate = 83;
+      } else if (country === 'NZ') {
+          userCurrency = 'nzd';
+          rate = 1.65;
+      } else if (country === 'AU') { // Australia added
+          userCurrency = 'aud';
+          rate = 1.52;
+      } else if (country === 'CA') { // Canada added
+          userCurrency = 'cad';
+          rate = 1.35;
+      } else if (country === 'SE') {
+          userCurrency = 'sek';
+          rate = 10.50;
+      } else if (country === 'DK') {
+          userCurrency = 'dkk';
+          rate = 6.85;
+      } else if (country === 'PL') {
+          userCurrency = 'pln';
+          rate = 3.95;
+      } else if (country === 'CH') {
+          userCurrency = 'chf';
+          rate = 0.88;
+      } else if (country === 'KR') {
+          userCurrency = 'krw';
+          rate = 1330;
+      } else if (country === 'BR') {
+          userCurrency = 'brl';
+          rate = 5.00;
+      }
 
       const finalAmount = Math.round(cleanPrice * rate * 100);
       const variantList = variant_name.split('|').map(v => v.trim()).filter(v => v !== "");
@@ -50,14 +93,15 @@ module.exports = async (req, res) => {
       }
 
       const session = await stripe.checkout.sessions.create({
-        // --- ONLY UPI ENABLED (CARD REMOVED) ---
-        payment_method_types: ['upi'], 
+        payment_method_types: ['card', 'klarna', 'afterpay_clearpay', 'ideal', 'bancontact', 'eps'],
         automatic_tax: { enabled: true },
         line_items: line_items,
         mode: 'payment',
-        // --- ONLY INDIA SHIPPING ---
+        // --- UPDATED SHIPPING COUNTRIES ---
         shipping_address_collection: { 
-            allowed_countries: ['IN'] 
+            allowed_countries: [
+                'US', 'CA', 'AU', 'PL', 'AT', 'CH', 'KR', 'BE', 'BR', 'NZ', 'IN', 'FR', 'DE', 'NL', 'ES', 'SE', 'GB', 'DK', 'FI', 'IE', 'IT', 'PT'
+            ] 
         },
         metadata: { full_variants: variant_name, product: product_name },
         success_url: 'https://lonovos.com/pages/thank-you',
