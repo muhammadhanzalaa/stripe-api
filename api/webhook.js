@@ -1,103 +1,69 @@
-const axios = require('axios');
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
-const getRawBody = require('raw-body');
 
-// 1. Vercel Config
-module.exports.config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
-// 2. Main Handler Function
 module.exports = async (req, res) => {
-  if (req.method !== 'POST') {
-    return res.status(405).send('Method Not Allowed');
-  }
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
-  const sig = req.headers['stripe-signature'];
-  let event;
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  try {
-    const rawBody = await getRawBody(req);
-    event = stripe.webhooks.constructEvent(
-      rawBody, 
-      sig, 
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.error("❌ Webhook Signature Error:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  // 3. Payment Successful hone par Shopify Order create karna
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-
-    // Name splitting logic (John Doe -> John | Doe)
-    const fullName = session.shipping_details?.name || session.customer_details?.name || "Customer";
-    const nameParts = fullName.split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(' ') || '';
-
-    const orderData = {
-      order: {
-        line_items: [{
-          title: session.metadata?.product_name || "Stripe Product",
-          price: (session.amount_total / 100).toFixed(2),
-          quantity: 1
-        }],
-        customer: {
-          email: session.customer_details?.email,
-          first_name: firstName,
-          last_name: lastName
-        },
-        // Detailed Address Mapping
-        shipping_address: {
-          address1: session.shipping_details?.address?.line1 || "",
-          address2: session.shipping_details?.address?.line2 || "",
-          city: session.shipping_details?.address?.city || "",
-          province: session.shipping_details?.address?.state || "",
-          zip: session.shipping_details?.address?.postal_code || "",
-          country: session.shipping_details?.address?.country || "",
-          first_name: firstName,
-          last_name: lastName,
-          phone: session.customer_details?.phone || ""
-        },
-        billing_address: {
-          address1: session.customer_details?.address?.line1 || session.shipping_details?.address?.line1 || "",
-          city: session.customer_details?.address?.city || session.shipping_details?.address?.city || "",
-          zip: session.customer_details?.address?.postal_code || session.shipping_details?.address?.postal_code || "",
-          country: session.customer_details?.address?.country || session.shipping_details?.address?.country || "",
-          first_name: firstName,
-          last_name: lastName
-        },
-        note: `Order from Stripe. Variants: ${session.metadata?.variants || "Standard"}`,
-        financial_status: "paid",
-        inventory_behaviour: "decrement_ignoring_policy"
-      }
-    };
-
+  if (req.method === 'POST') {
     try {
-      const rawShopifyUrl = process.env.SHOPIFY_STORE_URL || "";
-      const shopifyUrl = rawShopifyUrl.replace('https://', '').replace(/\/$/, '');
-      const token = process.env.SHOPIFY_CLIENT_SECRET;
+      const { product_name, variant_name, image_url, price, quantity, email } = req.body;
+      const cleanPrice = parseFloat(price);
+      const finalAmount = Math.round(cleanPrice * 100);
 
-      await axios.post(
-        `https://${shopifyUrl}/admin/api/2024-01/orders.json`,
-        orderData,
-        {
-          headers: {
-            'X-Shopify-Access-Token': token,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      console.log("✅ Shopify Order with Address Created Successfully!");
+      const userCurrency = 'eur';
+      const variantList = variant_name ? variant_name.split('|').map(v => v.trim()) : ["Default"];
+      
+      let line_items = [];
+      if (parseInt(quantity) === 3) {
+        line_items.push({
+          price_data: {
+            currency: userCurrency,
+            product_data: { name: product_name, images: [image_url], description: `Variants: ${variantList[0]}, ${variantList[1]}` },
+            unit_amount: finalAmount,
+          },
+          quantity: 2,
+        });
+        line_items.push({
+          price_data: {
+            currency: userCurrency,
+            product_data: { name: `FREE BUNDLE ITEM`, images: [image_url], description: `Free Variant: ${variantList[2] || 'Selected'}` },
+            unit_amount: 0,
+          },
+          quantity: 1,
+        });
+      } else {
+        line_items.push({
+          price_data: {
+            currency: userCurrency,
+            product_data: { name: product_name, images: [image_url], description: `Variant: ${variant_name}` },
+            unit_amount: finalAmount,
+          },
+          quantity: 1,
+        });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        customer_email: email, // Customer ki email Stripe ko bheji
+        payment_method_types: ['card', 'pix', 'multibanco', 'ideal', 'p24', 'bancontact', 'eps'], 
+        line_items: line_items,
+        mode: 'payment',
+        shipping_address_collection: { allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT', 'IN'] },
+        // Metadata keys ko simple rakha hai taake Webhook asani se read kare
+        metadata: { 
+          product_name: product_name, 
+          variants: variant_name 
+        },
+        success_url: 'https://lonovos.com/pages/thank-you',
+        cancel_url: 'https://lonovos.com/',
+      });
+
+      return res.status(200).json({ url: session.url });
     } catch (err) {
-      console.error("❌ Shopify API Error:", err.response ? JSON.stringify(err.response.data) : err.message);
+      return res.status(500).json({ error: err.message });
     }
   }
-
-  res.status(200).json({ received: true });
 };
