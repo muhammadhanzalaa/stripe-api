@@ -10,66 +10,50 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      const { product_name, variant_name, image_url, price, quantity } = req.body;
+      const { product_name, variant_name, image_url, price, quantity, currency } = req.body;
       const cleanPrice = parseFloat(price);
-
-      // --- CURRENCY SET TO EUR & RATE 1 ---
-      const userCurrency = 'eur'; 
-      const rate = 1; 
-
-      const finalAmount = Math.round(cleanPrice * rate * 100);
-      const variantList = variant_name.split('|').map(v => v.trim()).filter(v => v !== "");
       
-      let line_items = [];
-      if (quantity === 3) {
-        line_items.push({
-          price_data: {
-            currency: userCurrency,
-            product_data: { name: product_name, images: [image_url], description: `Variants: ${variantList[0]}, ${variantList[1]}` },
-            unit_amount: finalAmount,
-          },
-          quantity: 2,
-        });
-        line_items.push({
-          price_data: {
-            currency: userCurrency,
-            product_data: { name: `FREE BUNDLE ITEM`, images: [image_url], description: `Free Variant: ${variantList[2] || 'Selected'}` },
-            unit_amount: 0,
-          },
-          quantity: 1,
-        });
-      } else {
-        line_items.push({
-          price_data: {
-            currency: userCurrency,
-            product_data: { name: product_name, images: [image_url], description: `Variant: ${variant_name}` },
-            unit_amount: finalAmount,
-          },
-          quantity: 1,
-        });
+      // Dynamic currency from front-end
+      const userCurrency = currency ? currency.toLowerCase() : 'eur';
+      const finalAmount = Math.round(cleanPrice * 100);
+
+      // --- DYNAMIC PAYMENT METHODS (CARD REMOVED) ---
+      let payment_methods = []; 
+
+      if (userCurrency === 'brl') {
+        payment_methods.push('pix'); // Brazil ke liye Pix
+      } else if (userCurrency === 'pln') {
+        payment_methods.push('p24'); // Poland ke liye Blik/P24
+      } else if (userCurrency === 'eur') {
+        payment_methods.push('ideal', 'multibanco', 'bancontact', 'eps'); // EU methods
       }
 
+      // Agar koi method select na ho sake toh fallback (optional)
+      if (payment_methods.length === 0) {
+          payment_methods = ['ideal']; // Ya koi aur default method jo aapka account support kare
+      }
+
+      let line_items = [];
+      // (Aapka pehle wala bundle logic yahan same rahega)
+      line_items.push({
+        price_data: {
+          currency: userCurrency,
+          product_data: { name: product_name, images: [image_url], description: `Variant: ${variant_name}` },
+          unit_amount: finalAmount,
+        },
+        quantity: 1,
+      });
+
       const session = await stripe.checkout.sessions.create({
-        // --- ADDED CARD FOR ALL MARKETS ---
-        payment_method_types: [
-          'card', 
-          'pix', 
-          'multibanco', 
-          'ideal', 
-          'p24', 
-          'bancontact', 
-          'eps'
-        ], 
-        automatic_tax: { enabled: true },
+        payment_method_types: payment_methods, // No 'card' here
+        automatic_tax: { enabled: false },
         line_items: line_items,
         mode: 'payment',
-        // --- ADDED INDIA (IN) TO SHIPPING ---
+        // --- INDIA (IN) REMOVED FROM SHIPPING ---
         shipping_address_collection: { 
-            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT', 'IN'] 
+            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT'] 
         },
-        metadata: { full_variants: variant_name, product: product_name },
-        // --- TRACKING PARAMETERS ADDED TO SUCCESS URL ---
-        success_url: `https://lonovos.com/pages/thank-you?value=${cleanPrice}&currency=eur`, 
+        success_url: `https://lonovos.com/pages/thank-you?value=${cleanPrice}&currency=${userCurrency}`, 
         cancel_url: 'https://lonovos.com/',                
       });
 
