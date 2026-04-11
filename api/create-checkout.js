@@ -13,6 +13,7 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, quantity } = req.body;
       const cleanPrice = parseFloat(price);
 
+      // --- CURRENCY SET TO EUR ---
       const userCurrency = 'eur'; 
       const rate = 1; 
 
@@ -49,25 +50,27 @@ module.exports = async (req, res) => {
       }
 
       const session = await stripe.checkout.sessions.create({
-        // --- SEPA REMOVED DUE TO INELIGIBILITY ---
+        // --- ADDED CARD AND REMOVED SEPA ---
         payment_method_types: [
+          'card',         // Added back for immediate payments
           'pix', 
           'multibanco', 
           'ideal', 
           'p24', 
           'bancontact', 
           'eps'
-          'card'
         ], 
         automatic_tax: { enabled: true },
         line_items: line_items,
         mode: 'payment',
+        // --- ALLOWED COUNTRIES ---
         shipping_address_collection: { 
-            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT', 'IN'] 
+            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT'] 
         },
         metadata: { full_variants: variant_name, product: product_name },
-        success_url: 'https://lonovos.com/pages/thank-you', 
-        cancel_url: 'https://lonovos.com/',                
+        // --- DON'T FORGET TO UPDATE DOMAIN ---
+        success_url: 'https://lonovos.com/pages/thank-you',
+        cancel_url: 'https://lonovos.com/',
       });
 
       return res.status(200).json({ url: session.url });
