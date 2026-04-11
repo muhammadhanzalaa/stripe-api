@@ -1,6 +1,7 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 module.exports = async (req, res) => {
+  // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -14,20 +15,19 @@ module.exports = async (req, res) => {
       
       let userCurrency = currency ? currency.toLowerCase() : 'usd';
       let cleanPrice = parseFloat(price);
-      
-      // --- HYBRID LOGIC: Local Gateways vs USD Card ---
       let payment_methods = [];
 
+      // --- HYBRID CHECKOUT LOGIC ---
       if (userCurrency === 'brl') {
-        payment_methods = ['pix']; // Brazil local gateway
+        payment_methods = ['pix']; // Brazil logic
       } else if (userCurrency === 'pln') {
-        payment_methods = ['p24']; // Poland local gateway
+        payment_methods = ['p24']; // Poland/Blik logic
       } else if (userCurrency === 'eur') {
-        payment_methods = ['ideal', 'multibanco', 'bancontact', 'eps']; // EU local gateways
+        payment_methods = ['ideal', 'multibanco', 'bancontact', 'eps']; // EU logic
       } else {
-        // Agar currency BRL, PLN ya EUR nahi hai, toh USD mein convert karein aur CARD show karein
-        userCurrency = 'usd'; 
-        payment_methods = ['card']; // Default for all other countries
+        // Pakistan, India aur baqi sab ke liye USD + Card
+        userCurrency = 'usd';
+        payment_methods = ['card'];
       }
 
       const finalAmount = Math.round(cleanPrice * 100);
@@ -40,14 +40,14 @@ module.exports = async (req, res) => {
             product_data: { 
               name: product_name, 
               images: [image_url], 
-              description: `Variant: ${variant_name}` 
+              description: variant_name 
             },
             unit_amount: finalAmount,
           },
           quantity: 1,
         }],
         mode: 'payment',
-        // Shipping list mein selected countries aur USA/Canada/Global add kar dein
+        // Shipping list (India ko list se nikal diya hai shipping address mein)
         shipping_address_collection: { 
             allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT', 'US', 'CA', 'GB'] 
         },
