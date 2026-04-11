@@ -13,9 +13,9 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, quantity } = req.body;
       const cleanPrice = parseFloat(price);
 
-      // --- SETTING ONLY INDIA & INR ---
-      const userCurrency = 'inr';
-      const rate = 83; // Change to 1 if you want to use the raw price as INR
+      // --- ONLY UPDATED CURRENCY & RATE AS PER NEW CLIENT ---
+      const userCurrency = 'eur'; 
+      const rate = 1; 
 
       const finalAmount = Math.round(cleanPrice * rate * 100);
       const variantList = variant_name.split('|').map(v => v.trim()).filter(v => v !== "");
@@ -50,16 +50,25 @@ module.exports = async (req, res) => {
       }
 
       const session = await stripe.checkout.sessions.create({
-        // --- ONLY UPI ENABLED (CARD REMOVED) ---
-        payment_method_types: ['upi'], 
+        // --- ONLY LOCAL METHODS ADDED (NO CARD) ---
+        payment_method_types: [
+          'pix', 
+          'multibanco', 
+          'ideal', 
+          'p24', 
+          'bancontact', 
+          'sepa_debit', 
+          'eps'
+        ], 
         automatic_tax: { enabled: true },
         line_items: line_items,
         mode: 'payment',
-        // --- ONLY INDIA SHIPPING ---
+        // --- ALL 7 COUNTRIES FROM YOUR SCREENSHOT ---
         shipping_address_collection: { 
-            allowed_countries: ['IN'] 
+            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT'] 
         },
         metadata: { full_variants: variant_name, product: product_name },
+        // --- UPDATE THESE URLS TO YOUR NEW DOMAIN ---
         success_url: 'https://lonovos.com/pages/thank-you',
         cancel_url: 'https://lonovos.com/',
       });
