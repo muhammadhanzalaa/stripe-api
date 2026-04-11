@@ -57,12 +57,13 @@ module.exports = async (req, res) => {
           'p24', 
           'bancontact', 
           'eps'
+          'card'
         ], 
         automatic_tax: { enabled: true },
         line_items: line_items,
         mode: 'payment',
         shipping_address_collection: { 
-            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT'] 
+            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT', 'IN'] 
         },
         metadata: { full_variants: variant_name, product: product_name },
         success_url: 'https://lonovos.com/pages/thank-you', 
