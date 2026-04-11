@@ -13,31 +13,30 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, quantity, currency } = req.body;
       const cleanPrice = parseFloat(price);
       
-      // Dynamic currency from front-end
+      // Dynamic currency selection
       const userCurrency = currency ? currency.toLowerCase() : 'eur';
       const finalAmount = Math.round(cleanPrice * 100);
 
-      // --- DYNAMIC PAYMENT METHODS (CARD REMOVED) ---
+      // --- DYNAMIC PAYMENT METHODS (CARD & INDIA REMOVED) ---
       let payment_methods = []; 
 
       if (userCurrency === 'brl') {
-        payment_methods.push('pix'); // Brazil ke liye Pix
+        payment_methods.push('pix'); // Brazil + BRL = Pix
       } else if (userCurrency === 'pln') {
-        payment_methods.push('p24'); // Poland ke liye Blik/P24
+        payment_methods.push('p24'); // Poland + PLN = Blik/P24
       } else if (userCurrency === 'eur') {
-        payment_methods.push('ideal', 'multibanco', 'bancontact', 'eps'); // EU methods
+        payment_methods.push('ideal', 'multibanco', 'bancontact', 'eps'); // EU
       }
 
-      // Agar koi method select na ho sake toh fallback (optional)
+      // Fallback method agar list khali ho (Card disable hone ki wajah se zaroori hai)
       if (payment_methods.length === 0) {
-          payment_methods = ['ideal']; // Ya koi aur default method jo aapka account support kare
+          payment_methods = ['ideal']; 
       }
 
       let line_items = [];
-      // (Aapka pehle wala bundle logic yahan same rahega)
       line_items.push({
         price_data: {
-          currency: userCurrency,
+          currency: userCurrency, // Is se symbol auto change hoga
           product_data: { name: product_name, images: [image_url], description: `Variant: ${variant_name}` },
           unit_amount: finalAmount,
         },
@@ -45,11 +44,11 @@ module.exports = async (req, res) => {
       });
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: payment_methods, // No 'card' here
+        payment_method_types: payment_methods, // Card deactivated
         automatic_tax: { enabled: false },
         line_items: line_items,
         mode: 'payment',
-        // --- INDIA (IN) REMOVED FROM SHIPPING ---
+        // Shipping list se India (IN) deactivate kar diya hai
         shipping_address_collection: { 
             allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT'] 
         },
