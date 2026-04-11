@@ -11,46 +11,45 @@ module.exports = async (req, res) => {
   if (req.method === 'POST') {
     try {
       const { product_name, variant_name, image_url, price, quantity, currency } = req.body;
-      const cleanPrice = parseFloat(price);
       
-      // Dynamic currency selection
-      const userCurrency = currency ? currency.toLowerCase() : 'eur';
-      const finalAmount = Math.round(cleanPrice * 100);
-
-      // --- DYNAMIC PAYMENT METHODS (CARD & INDIA REMOVED) ---
-      let payment_methods = []; 
+      let userCurrency = currency ? currency.toLowerCase() : 'usd';
+      let cleanPrice = parseFloat(price);
+      
+      // --- HYBRID LOGIC: Local Gateways vs USD Card ---
+      let payment_methods = [];
 
       if (userCurrency === 'brl') {
-        payment_methods.push('pix'); // Brazil + BRL = Pix
+        payment_methods = ['pix']; // Brazil local gateway
       } else if (userCurrency === 'pln') {
-        payment_methods.push('p24'); // Poland + PLN = Blik/P24
+        payment_methods = ['p24']; // Poland local gateway
       } else if (userCurrency === 'eur') {
-        payment_methods.push('ideal', 'multibanco', 'bancontact', 'eps'); // EU
+        payment_methods = ['ideal', 'multibanco', 'bancontact', 'eps']; // EU local gateways
+      } else {
+        // Agar currency BRL, PLN ya EUR nahi hai, toh USD mein convert karein aur CARD show karein
+        userCurrency = 'usd'; 
+        payment_methods = ['card']; // Default for all other countries
       }
 
-      // Fallback method agar list khali ho (Card disable hone ki wajah se zaroori hai)
-      if (payment_methods.length === 0) {
-          payment_methods = ['ideal']; 
-      }
-
-      let line_items = [];
-      line_items.push({
-        price_data: {
-          currency: userCurrency, // Is se symbol auto change hoga
-          product_data: { name: product_name, images: [image_url], description: `Variant: ${variant_name}` },
-          unit_amount: finalAmount,
-        },
-        quantity: 1,
-      });
+      const finalAmount = Math.round(cleanPrice * 100);
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: payment_methods, // Card deactivated
-        automatic_tax: { enabled: false },
-        line_items: line_items,
+        payment_method_types: payment_methods,
+        line_items: [{
+          price_data: {
+            currency: userCurrency,
+            product_data: { 
+              name: product_name, 
+              images: [image_url], 
+              description: `Variant: ${variant_name}` 
+            },
+            unit_amount: finalAmount,
+          },
+          quantity: 1,
+        }],
         mode: 'payment',
-        // Shipping list se India (IN) deactivate kar diya hai
+        // Shipping list mein selected countries aur USA/Canada/Global add kar dein
         shipping_address_collection: { 
-            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT'] 
+            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT', 'US', 'CA', 'GB'] 
         },
         success_url: `https://lonovos.com/pages/thank-you?value=${cleanPrice}&currency=${userCurrency}`, 
         cancel_url: 'https://lonovos.com/',                
