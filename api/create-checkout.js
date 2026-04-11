@@ -13,7 +13,6 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, quantity } = req.body;
       const cleanPrice = parseFloat(price);
 
-      // --- ONLY UPDATED CURRENCY & RATE AS PER NEW CLIENT ---
       const userCurrency = 'eur'; 
       const rate = 1; 
 
@@ -50,27 +49,24 @@ module.exports = async (req, res) => {
       }
 
       const session = await stripe.checkout.sessions.create({
-        // --- ONLY LOCAL METHODS ADDED (NO CARD) ---
+        // --- SEPA REMOVED DUE TO INELIGIBILITY ---
         payment_method_types: [
           'pix', 
           'multibanco', 
           'ideal', 
           'p24', 
           'bancontact', 
-          'sepa_debit', 
           'eps'
         ], 
         automatic_tax: { enabled: true },
         line_items: line_items,
         mode: 'payment',
-        // --- ALL 7 COUNTRIES FROM YOUR SCREENSHOT ---
         shipping_address_collection: { 
             allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT'] 
         },
         metadata: { full_variants: variant_name, product: product_name },
-        // --- UPDATE THESE URLS TO YOUR NEW DOMAIN ---
-        success_url: 'https://lonovos.com/pages/thank-you',
-        cancel_url: 'https://lonovos.com/',
+        success_url: 'https://lonovos.com/pages/thank-you', 
+        cancel_url: 'https://lonovos.com/',                
       });
 
       return res.status(200).json({ url: session.url });
