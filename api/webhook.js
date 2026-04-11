@@ -1,69 +1,120 @@
+const axios = require('axios');
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
+const getRawBody = require('raw-body');
 
+// 1. Vercel Config
+module.exports.config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+// 2. Main Handler Function
 module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  // Method Check
+  if (req.method !== 'POST') {
+    return res.status(405).send('Method Not Allowed');
+  }
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  const sig = req.headers['stripe-signature'];
+  let event;
 
-  if (req.method === 'POST') {
+  try {
+    const rawBody = await getRawBody(req);
+    // Signature verification
+    event = stripe.webhooks.constructEvent(
+      rawBody,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error("❌ Webhook Signature Error:", err.message);
+    // Yahan 400 bhej rahe hain taake Stripe ko pata chale signature galat hai
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // 3. Payment Successful Logic
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+
     try {
-      const { product_name, variant_name, image_url, price, quantity, email } = req.body;
-      const cleanPrice = parseFloat(price);
-      const finalAmount = Math.round(cleanPrice * 100);
+      // Name splitting safely
+      const fullName = session.shipping_details?.name || session.customer_details?.name || "Customer";
+      const nameParts = fullName.trim().split(/\s+/);
+      const firstName = nameParts[0] || "Customer";
+      const lastName = nameParts.slice(1).join(' ') || "";
 
-      const userCurrency = 'eur';
-      const variantList = variant_name ? variant_name.split('|').map(v => v.trim()) : ["Default"];
-      
-      let line_items = [];
-      if (parseInt(quantity) === 3) {
-        line_items.push({
-          price_data: {
-            currency: userCurrency,
-            product_data: { name: product_name, images: [image_url], description: `Variants: ${variantList[0]}, ${variantList[1]}` },
-            unit_amount: finalAmount,
+      // Shopify Order Payload
+      const orderData = {
+        order: {
+          // Email triggers ke liye ye fields lazmi hain
+          email: session.customer_details?.email,
+          send_receipt: true, // <--- Is se customer ko email jayegi
+          financial_status: "paid",
+          
+          line_items: [{
+            title: session.metadata?.product_name || "Product",
+            price: (session.amount_total / 100).toFixed(2),
+            quantity: 1
+          }],
+          customer: {
+            email: session.customer_details?.email,
+            first_name: firstName,
+            last_name: lastName
           },
-          quantity: 2,
-        });
-        line_items.push({
-          price_data: {
-            currency: userCurrency,
-            product_data: { name: `FREE BUNDLE ITEM`, images: [image_url], description: `Free Variant: ${variantList[2] || 'Selected'}` },
-            unit_amount: 0,
+          shipping_address: {
+            address1: session.shipping_details?.address?.line1 || "",
+            address2: session.shipping_details?.address?.line2 || "",
+            city: session.shipping_details?.address?.city || "",
+            province: session.shipping_details?.address?.state || "",
+            zip: session.shipping_details?.address?.postal_code || "",
+            country: session.shipping_details?.address?.country || "",
+            first_name: firstName,
+            last_name: lastName,
+            phone: session.customer_details?.phone || ""
           },
-          quantity: 1,
-        });
-      } else {
-        line_items.push({
-          price_data: {
-            currency: userCurrency,
-            product_data: { name: product_name, images: [image_url], description: `Variant: ${variant_name}` },
-            unit_amount: finalAmount,
+          billing_address: {
+            address1: session.customer_details?.address?.line1 || session.shipping_details?.address?.line1 || "",
+            city: session.customer_details?.address?.city || session.shipping_details?.address?.city || "",
+            zip: session.customer_details?.address?.postal_code || session.shipping_details?.address?.postal_code || "",
+            country: session.customer_details?.address?.country || session.shipping_details?.address?.country || "",
+            first_name: firstName,
+            last_name: lastName
           },
-          quantity: 1,
-        });
+          note: `Order from Stripe. Variants: ${session.metadata?.variants || "Standard"}`,
+          inventory_behaviour: "decrement_ignoring_policy"
+        }
+      };
+
+      // Shopify API Call
+      const rawShopifyUrl = process.env.SHOPIFY_STORE_URL || "";
+      const shopifyUrl = rawShopifyUrl.replace('https://', '').replace(/\/$/, '');
+      const token = process.env.SHOPIFY_CLIENT_SECRET;
+
+      if (!token || !shopifyUrl) {
+        throw new Error("Missing Shopify Configuration in Environment Variables");
       }
 
-      const session = await stripe.checkout.sessions.create({
-        customer_email: email, // Customer ki email Stripe ko bheji
-        payment_method_types: ['card', 'pix', 'multibanco', 'ideal', 'p24', 'bancontact', 'eps'], 
-        line_items: line_items,
-        mode: 'payment',
-        shipping_address_collection: { allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT', 'IN'] },
-        // Metadata keys ko simple rakha hai taake Webhook asani se read kare
-        metadata: { 
-          product_name: product_name, 
-          variants: variant_name 
-        },
-        success_url: 'https://lonovos.com/pages/thank-you',
-        cancel_url: 'https://lonovos.com/',
-      });
+      await axios.post(
+        `https://${shopifyUrl}/admin/api/2024-01/orders.json`,
+        orderData,
+        {
+          headers: {
+            'X-Shopify-Access-Token': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log("✅ Shopify Order Created & Email Sent!");
 
-      return res.status(200).json({ url: session.url });
     } catch (err) {
-      return res.status(500).json({ error: err.message });
+      // Yahan console log karein taake Vercel logs mein error dikhe
+      console.error("❌ Shopify API Error:", err.response ? JSON.stringify(err.response.data) : err.message);
+      // Note: Hum yahan status 200 hi bhejenge taake Stripe baar baar retry karke error na de
     }
   }
+
+  // Stripe ko hamesha 200 OK bhejna chahiye
+  res.status(200).json({ received: true });
 };
