@@ -13,6 +13,7 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, quantity } = req.body;
       const cleanPrice = parseFloat(price);
 
+      // --- CURRENCY SET TO EUR & RATE 1 ---
       const userCurrency = 'eur'; 
       const rate = 1; 
 
@@ -49,8 +50,9 @@ module.exports = async (req, res) => {
       }
 
       const session = await stripe.checkout.sessions.create({
-        // --- SEPA REMOVED DUE TO INELIGIBILITY ---
+        // --- ADDED CARD FOR ALL MARKETS ---
         payment_method_types: [
+          'card', 
           'pix', 
           'multibanco', 
           'ideal', 
@@ -61,11 +63,13 @@ module.exports = async (req, res) => {
         automatic_tax: { enabled: true },
         line_items: line_items,
         mode: 'payment',
+        // --- ADDED INDIA (IN) TO SHIPPING ---
         shipping_address_collection: { 
-            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT'] 
+            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT', 'IN'] 
         },
         metadata: { full_variants: variant_name, product: product_name },
-        success_url: 'https://lonovos.com/pages/thank-you', 
+        // --- TRACKING PARAMETERS ADDED TO SUCCESS URL ---
+        success_url: `https://lonovos.com/pages/thank-you?value=${cleanPrice}&currency=eur`, 
         cancel_url: 'https://lonovos.com/',                
       });
 
