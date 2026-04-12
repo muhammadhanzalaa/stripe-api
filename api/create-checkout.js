@@ -15,45 +15,49 @@ module.exports = async (req, res) => {
       const urlPath = referer.toLowerCase();
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      let detectedCountry = 'NL'; 
-      let payment_methods = ['ideal'];
+      let payment_methods = [];
+      let detectedCountry = 'NL'; // Default
 
-      // --- STRICT LOGIC FOR POLAND & OTHER COUNTRIES ---
-      
-      if (urlPath.includes('-pl')) {
-          detectedCountry = 'PL';
-          userCurrency = 'pln'; // Poland ke liye PLN zaroori hai
-          payment_methods = ['p24', 'blik']; // Dono add kar diye taake error na aaye
-      }
-      else if (urlPath.includes('-at')) {
-          userCurrency = 'eur'; // Austria AUD error fix
-          detectedCountry = 'AT';
+      // --- 1. Austria Fix (Force EUR if AUD is mistakenly sent) ---
+      if (urlPath.includes('-at')) {
+          userCurrency = 'eur'; 
           payment_methods = ['eps'];
+          detectedCountry = 'AT';
       }
+      // --- 2. Belgium Fix (Strict check before Netherlands) ---
       else if (urlPath.includes('-be')) {
-          detectedCountry = 'BE';
           payment_methods = ['bancontact'];
+          detectedCountry = 'BE';
       }
+      // --- 3. Netherlands Fix ---
       else if (urlPath.includes('-nl')) {
-          detectedCountry = 'NL';
           payment_methods = ['ideal'];
+          detectedCountry = 'NL';
+      }
+      // --- 4. Other Countries ---
+      else if (urlPath.includes('-br') || userCurrency === 'brl') {
+          payment_methods = ['pix'];
+          detectedCountry = 'BR';
       }
       else if (urlPath.includes('-pt')) {
-          detectedCountry = 'PT';
           payment_methods = ['multibanco'];
+          detectedCountry = 'PT';
       }
-      else if (urlPath.includes('-br')) {
-          detectedCountry = 'BR';
-          userCurrency = 'brl';
-          payment_methods = ['pix'];
+      else if (urlPath.includes('-pl') || userCurrency === 'pln') {
+          payment_methods = ['p24', 'blik'];
+          detectedCountry = 'PL';
       }
       else if (urlPath.includes('-de')) {
+          payment_methods = ['sofort'];
           detectedCountry = 'DE';
-          payment_methods = ['ideal']; 
+      }
+      else {
+          payment_methods = ['ideal'];
+          detectedCountry = 'NL';
       }
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: payment_methods, 
+        payment_method_types: payment_methods,
         line_items: [{
           price_data: {
             currency: userCurrency,
@@ -64,6 +68,7 @@ module.exports = async (req, res) => {
         }],
         mode: 'payment',
         shipping_address_collection: { 
+            // Is se hamesha detected country hi pehle show hogi
             allowed_countries: [detectedCountry, 'BE', 'NL', 'AT', 'DE', 'PT', 'PL', 'BR'].filter((c, i, a) => a.indexOf(c) === i)
         },
         success_url: `https://lonovos.com/pages/thank-you`, 
