@@ -12,32 +12,35 @@ module.exports = async (req, res) => {
     try {
       const { product_name, variant_name, image_url, price, currency } = req.body;
       
-      // Dynamic Domain Detection
       const referer = req.headers.referer || "https://lonovos.com/";
       const urlObj = new URL(referer);
       const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
 
       let userCurrency = currency ? currency.toLowerCase() : 'usd';
       let cleanPrice = parseFloat(price);
-      let payment_methods = ['card']; // Default
+      
+      // Default payment method
+      let payment_methods = ['card']; 
 
-      // Specific Payment Methods Logic
+      // --- SPECIFIC PAYMENT METHODS LOGIC (Based on your list) ---
+      
       if (userCurrency === 'brl') {
-        payment_methods = ['pix'];
-      } else if (userCurrency === 'pln') {
-        payment_methods = ['p24'];
-      } else if (userCurrency === 'eur') {
-        payment_methods = ['ideal', 'bancontact', 'eps'];
-      } else {
-        // Baqi sab currencies (CHF, USD, GBP etc) ke liye Card enabled rahega
-        payment_methods = ['card'];
+        payment_methods = ['pix']; // Brazil
+      } 
+      else if (userCurrency === 'eur') {
+        // Portugal, Netherlands, Belgium, Germany, Austria sab EUR use karte hain
+        // Hamein in sab ko combine karna hoga taake Stripe auto-detect kare
+        payment_methods = ['ideal', 'bancontact', 'sepa_debit', 'eps', 'multibanco', 'card'];
+      } 
+      else if (userCurrency === 'pln') {
+        payment_methods = ['p24', 'blik', 'card']; // Poland (P24 covers BLIK)
       }
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: payment_methods,
         line_items: [{
           price_data: {
-            currency: userCurrency, // Jo frontend se aayi wahi use hogi
+            currency: userCurrency,
             product_data: { 
               name: product_name, 
               images: [image_url], 
@@ -48,8 +51,9 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
+        // Sirf wahi countries allow ki hain jo aapne mangi hain
         shipping_address_collection: { 
-            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT', 'US', 'CA', 'GB', 'CH'] 
+            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT'] 
         },
         success_url: `${baseUrl}/pages/thank-you?value=${cleanPrice}&currency=${userCurrency}`, 
         cancel_url: `${baseUrl}`,                
