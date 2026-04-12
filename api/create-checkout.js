@@ -14,62 +14,33 @@ module.exports = async (req, res) => {
       const referer = req.headers.referer || "";
       const urlPath = referer.toLowerCase();
       
+      // Default currency handling to prevent AUD errors in Europe
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      let payment_methods = [];
-      let detectedCountry = 'NL'; // Default
-
-      // --- 1. Austria Fix (Force EUR if AUD is mistakenly sent) ---
-      if (urlPath.includes('-at')) {
-          userCurrency = 'eur'; 
-          payment_methods = ['eps'];
-          detectedCountry = 'AT';
-      }
-      // --- 2. Belgium Fix (Strict check before Netherlands) ---
-      else if (urlPath.includes('-be')) {
-          payment_methods = ['bancontact'];
-          detectedCountry = 'BE';
-      }
-      // --- 3. Netherlands Fix ---
-      else if (urlPath.includes('-nl')) {
-          payment_methods = ['ideal'];
-          detectedCountry = 'NL';
-      }
-      // --- 4. Other Countries ---
-      else if (urlPath.includes('-br') || userCurrency === 'brl') {
-          payment_methods = ['pix'];
-          detectedCountry = 'BR';
-      }
-      else if (urlPath.includes('-pt')) {
-          payment_methods = ['multibanco'];
-          detectedCountry = 'PT';
-      }
-      else if (urlPath.includes('-pl') || userCurrency === 'pln') {
-          payment_methods = ['p24', 'blik'];
-          detectedCountry = 'PL';
-      }
-      else if (urlPath.includes('-de')) {
-          payment_methods = ['sofort'];
-          detectedCountry = 'DE';
-      }
-      else {
-          payment_methods = ['ideal'];
-          detectedCountry = 'NL';
+      
+      // Austria, Germany, Netherlands, Belgium ke liye force EUR karein
+      if (urlPath.includes('-at') || urlPath.includes('-de') || urlPath.includes('-nl') || urlPath.includes('-be')) {
+          userCurrency = 'eur';
       }
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: payment_methods,
+        // DYNAMIC LOGIC: Specific methods list kar diye hain, Stripe address ke mutabiq dikhayega
+        payment_method_types: ['ideal', 'bancontact', 'eps', 'multibanco', 'p24', 'blik', 'pix', 'sofort'],
         line_items: [{
           price_data: {
             currency: userCurrency,
-            product_data: { name: product_name, images: [image_url], description: variant_name },
+            product_data: { 
+              name: product_name, 
+              images: [image_url], 
+              description: variant_name 
+            },
             unit_amount: Math.round(parseFloat(price) * 100),
           },
           quantity: 1,
         }],
         mode: 'payment',
+        // Address dropdown list
         shipping_address_collection: { 
-            // Is se hamesha detected country hi pehle show hogi
-            allowed_countries: [detectedCountry, 'BE', 'NL', 'AT', 'DE', 'PT', 'PL', 'BR'].filter((c, i, a) => a.indexOf(c) === i)
+            allowed_countries: ['AT', 'BE', 'NL', 'DE', 'PT', 'PL', 'BR'] 
         },
         success_url: `https://lonovos.com/pages/thank-you`, 
         cancel_url: `https://lonovos.com/`,                
