@@ -16,44 +16,43 @@ module.exports = async (req, res) => {
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
       let detectedCountry = 'NL'; 
-      let payment_methods = ['ideal']; // Default
+      let payment_methods = ['ideal'];
 
-      // --- STRICT COUNTRY & PAYMENT LOGIC ---
+      // --- STRICT LOGIC FOR POLAND & OTHER COUNTRIES ---
       
-      if (urlPath.includes('-at')) {
-          userCurrency = 'eur'; // Force EUR for Austria
+      if (urlPath.includes('-pl')) {
+          detectedCountry = 'PL';
+          userCurrency = 'pln'; // Poland ke liye PLN zaroori hai
+          payment_methods = ['p24', 'blik']; // Dono add kar diye taake error na aaye
+      }
+      else if (urlPath.includes('-at')) {
+          userCurrency = 'eur'; // Austria AUD error fix
           detectedCountry = 'AT';
-          payment_methods = ['eps']; // ONLY EPS for Austria
+          payment_methods = ['eps'];
       }
       else if (urlPath.includes('-be')) {
           detectedCountry = 'BE';
-          payment_methods = ['bancontact']; // ONLY Bancontact for Belgium
+          payment_methods = ['bancontact'];
       }
       else if (urlPath.includes('-nl')) {
           detectedCountry = 'NL';
-          payment_methods = ['ideal']; // ONLY iDEAL for Netherlands
+          payment_methods = ['ideal'];
       }
       else if (urlPath.includes('-pt')) {
           detectedCountry = 'PT';
-          payment_methods = ['multibanco']; // ONLY Multibanco for Portugal
-      }
-      else if (urlPath.includes('-pl')) {
-          detectedCountry = 'PL';
-          userCurrency = 'pln';
-          payment_methods = ['p24']; // ONLY P24 for Poland
+          payment_methods = ['multibanco'];
       }
       else if (urlPath.includes('-br')) {
           detectedCountry = 'BR';
           userCurrency = 'brl';
-          payment_methods = ['pix']; // ONLY Pix for Brazil
+          payment_methods = ['pix'];
       }
       else if (urlPath.includes('-de')) {
           detectedCountry = 'DE';
-          payment_methods = ['ideal']; // Default for DE if Sofort is invalid
+          payment_methods = ['ideal']; 
       }
 
       const session = await stripe.checkout.sessions.create({
-        // Yahan 'payment_methods' variable use ho raha hai jo upar country wise lock hai
         payment_method_types: payment_methods, 
         line_items: [{
           price_data: {
