@@ -12,41 +12,47 @@ module.exports = async (req, res) => {
     try {
       const { product_name, variant_name, image_url, price, currency } = req.body;
       
-      // Referer se Country detect karna (e.g., /en-nl ya /en-be)
       const referer = req.headers.referer || "";
       const urlPath = referer.toLowerCase();
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
       let cleanPrice = parseFloat(price);
       let payment_methods = [];
-
-      // --- STRICT COUNTRY MAPPING LOGIC ---
+      
+      // --- LOGIC: Detect specific country from URL ---
+      let detectedCountry = 'NL'; // Default initialization
       
       if (urlPath.includes('-br') || userCurrency === 'brl') {
-        payment_methods = ['pix']; // Brazil Only
+        payment_methods = ['pix'];
+        detectedCountry = 'BR';
       } 
       else if (urlPath.includes('-nl')) {
-        payment_methods = ['ideal']; // Netherlands Only
+        payment_methods = ['ideal'];
+        detectedCountry = 'NL';
       }
       else if (urlPath.includes('-be')) {
-        payment_methods = ['bancontact']; // Belgium Only
+        payment_methods = ['bancontact'];
+        detectedCountry = 'BE';
       }
       else if (urlPath.includes('-at')) {
-        payment_methods = ['eps']; // Austria Only
+        payment_methods = ['eps'];
+        detectedCountry = 'AT';
       }
       else if (urlPath.includes('-pt')) {
-        payment_methods = ['multibanco']; // Portugal Only
+        payment_methods = ['multibanco'];
+        detectedCountry = 'PT';
       }
       else if (urlPath.includes('-pl') || userCurrency === 'pln') {
-        payment_methods = ['p24', 'blik']; // Poland Only
+        payment_methods = ['p24', 'blik'];
+        detectedCountry = 'PL';
       }
       else if (urlPath.includes('-de')) {
-        // Germany ke liye agar Giropay/SEPA nahi chahiye toh Sofort ya iDEAL
         payment_methods = ['sofort']; 
+        detectedCountry = 'DE';
       }
       else {
-        // Fallback agar koi match na ho (Stripe needs at least one)
         payment_methods = ['ideal'];
+        detectedCountry = 'NL';
       }
 
       const session = await stripe.checkout.sessions.create({
@@ -64,8 +70,10 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
+        // FIX: 'allowed_countries' mein 'detectedCountry' ko pehle rakha hai taake 
+        // Belgium walon ko address mein Brazil nazar na aaye.
         shipping_address_collection: { 
-            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT'] 
+            allowed_countries: [detectedCountry, 'BE', 'NL', 'AT', 'DE', 'PT', 'PL', 'BR'] 
         },
         success_url: `https://lonovos.com/pages/thank-you`, 
         cancel_url: `https://lonovos.com/`,                
