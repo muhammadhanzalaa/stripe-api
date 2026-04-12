@@ -19,21 +19,25 @@ module.exports = async (req, res) => {
       let userCurrency = currency ? currency.toLowerCase() : 'usd';
       let cleanPrice = parseFloat(price);
       
-      // Default payment method
-      let payment_methods = ['card']; 
+      // Khali array, card yahan se nikal diya hai
+      let payment_methods = []; 
 
-      // --- SPECIFIC PAYMENT METHODS LOGIC (Based on your list) ---
+      // --- STRICT LOCAL METHODS ONLY ---
       
       if (userCurrency === 'brl') {
         payment_methods = ['pix']; // Brazil
       } 
       else if (userCurrency === 'eur') {
-        // Portugal, Netherlands, Belgium, Germany, Austria sab EUR use karte hain
-        // Hamein in sab ko combine karna hoga taake Stripe auto-detect kare
-        payment_methods = ['ideal', 'bancontact', 'sepa_debit', 'eps', 'multibanco', 'card'];
+        // Germany, Netherlands, Belgium, Austria, Portugal ke liye sirf local methods
+        payment_methods = ['ideal', 'bancontact', 'giropay', 'sofort', 'eps', 'multibanco'];
       } 
       else if (userCurrency === 'pln') {
-        payment_methods = ['p24', 'blik', 'card']; // Poland (P24 covers BLIK)
+        payment_methods = ['p24', 'blik']; // Poland
+      } else {
+        // Agar koi aur currency ho toh error se bachne ke liye Pix ya iDEAL default rakh sakte hain
+        // Ya phir yahan 'card' rehne dena safe hota hai. 
+        // Lekin aapki request ke mutabiq maine card hata diya hai.
+        payment_methods = ['ideal']; 
       }
 
       const session = await stripe.checkout.sessions.create({
@@ -51,7 +55,6 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
-        // Sirf wahi countries allow ki hain jo aapne mangi hain
         shipping_address_collection: { 
             allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT'] 
         },
