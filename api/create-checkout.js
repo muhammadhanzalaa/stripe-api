@@ -1,7 +1,6 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 module.exports = async (req, res) => {
-  // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -11,19 +10,18 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      const { product_name, variant_name, image_url, price, quantity, currency } = req.body;
+      const { product_name, variant_name, image_url, price, currency } = req.body;
       
-      // 1. Dynamic Domain Detection (Success/Cancel page ke liye)
+      // Dynamic Domain Detection
       const referer = req.headers.referer || "https://lonovos.com/";
       const urlObj = new URL(referer);
       const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
 
-      // 2. Currency Handling
       let userCurrency = currency ? currency.toLowerCase() : 'usd';
       let cleanPrice = parseFloat(price);
-      let payment_methods = [];
+      let payment_methods = ['card']; // Default
 
-      // 3. Hybrid Payment Logic
+      // Specific Payment Methods Logic
       if (userCurrency === 'brl') {
         payment_methods = ['pix'];
       } else if (userCurrency === 'pln') {
@@ -31,33 +29,28 @@ module.exports = async (req, res) => {
       } else if (userCurrency === 'eur') {
         payment_methods = ['ideal', 'bancontact', 'eps'];
       } else {
-        userCurrency = 'usd';
+        // Baqi sab currencies (CHF, USD, GBP etc) ke liye Card enabled rahega
         payment_methods = ['card'];
       }
 
-      const finalAmount = Math.round(cleanPrice * 100);
-
-      // 4. Create Stripe Session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: payment_methods,
         line_items: [{
           price_data: {
-            currency: userCurrency,
+            currency: userCurrency, // Jo frontend se aayi wahi use hogi
             product_data: { 
               name: product_name, 
               images: [image_url], 
-              // Fallback for empty description error
               description: variant_name || "Standard Selection" 
             },
-            unit_amount: finalAmount,
+            unit_amount: Math.round(cleanPrice * 100),
           },
           quantity: 1,
         }],
         mode: 'payment',
         shipping_address_collection: { 
-            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT', 'US', 'CA', 'GB'] 
+            allowed_countries: ['BR', 'PT', 'NL', 'PL', 'BE', 'DE', 'AT', 'US', 'CA', 'GB', 'CH'] 
         },
-        // Redirect wapas usi store par jayega jahan se order aya
         success_url: `${baseUrl}/pages/thank-you?value=${cleanPrice}&currency=${userCurrency}`, 
         cancel_url: `${baseUrl}`,                
       });
@@ -65,7 +58,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ url: session.url });
 
     } catch (err) {
-      console.error("Stripe Error:", err.message);
       return res.status(500).json({ error: err.message });
     }
   }
