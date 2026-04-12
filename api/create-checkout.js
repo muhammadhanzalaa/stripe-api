@@ -15,53 +15,56 @@ module.exports = async (req, res) => {
       const urlPath = referer.toLowerCase();
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      let detectedCountry = 'NL'; // Default
+      let detectedCountry = 'NL'; 
+      let payment_methods = ['ideal']; // Default
 
-      // --- 1. Store detection logic (IP/URL based) ---
+      // --- STRICT COUNTRY & PAYMENT LOGIC ---
+      
       if (urlPath.includes('-at')) {
-          userCurrency = 'eur'; // Force EUR for Austria to fix AUD error
+          userCurrency = 'eur'; // Force EUR for Austria
           detectedCountry = 'AT';
+          payment_methods = ['eps']; // ONLY EPS for Austria
       }
       else if (urlPath.includes('-be')) {
           detectedCountry = 'BE';
+          payment_methods = ['bancontact']; // ONLY Bancontact for Belgium
       }
-      else if (urlPath.includes('-br')) {
-          detectedCountry = 'BR';
-          userCurrency = 'brl';
+      else if (urlPath.includes('-nl')) {
+          detectedCountry = 'NL';
+          payment_methods = ['ideal']; // ONLY iDEAL for Netherlands
       }
       else if (urlPath.includes('-pt')) {
           detectedCountry = 'PT';
+          payment_methods = ['multibanco']; // ONLY Multibanco for Portugal
       }
       else if (urlPath.includes('-pl')) {
           detectedCountry = 'PL';
           userCurrency = 'pln';
+          payment_methods = ['p24']; // ONLY P24 for Poland
+      }
+      else if (urlPath.includes('-br')) {
+          detectedCountry = 'BR';
+          userCurrency = 'brl';
+          payment_methods = ['pix']; // ONLY Pix for Brazil
       }
       else if (urlPath.includes('-de')) {
           detectedCountry = 'DE';
-      }
-      else if (urlPath.includes('-nl')) {
-          detectedCountry = 'NL';
+          payment_methods = ['ideal']; // Default for DE if Sofort is invalid
       }
 
-      // --- 2. Create Dynamic Session ---
       const session = await stripe.checkout.sessions.create({
-        // Humne sirf wo methods rakhe hain jo error nahi dete
-        payment_method_types: ['ideal', 'bancontact', 'eps', 'multibanco', 'p24', 'pix'],
+        // Yahan 'payment_methods' variable use ho raha hai jo upar country wise lock hai
+        payment_method_types: payment_methods, 
         line_items: [{
           price_data: {
             currency: userCurrency,
-            product_data: { 
-              name: product_name, 
-              images: [image_url], 
-              description: variant_name 
-            },
+            product_data: { name: product_name, images: [image_url], description: variant_name },
             unit_amount: Math.round(parseFloat(price) * 100),
           },
           quantity: 1,
         }],
         mode: 'payment',
         shipping_address_collection: { 
-            // Detected country dropdown mein pehle aayegi
             allowed_countries: [detectedCountry, 'BE', 'NL', 'AT', 'DE', 'PT', 'PL', 'BR'].filter((c, i, a) => a.indexOf(c) === i)
         },
         success_url: `https://lonovos.com/pages/thank-you`, 
@@ -71,7 +74,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ url: session.url });
 
     } catch (err) {
-      // Agar error aaye toh humein pata chale ke kyun aa raha hai
       return res.status(500).json({ error: err.message });
     }
   }
