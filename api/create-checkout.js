@@ -19,24 +19,22 @@ module.exports = async (req, res) => {
       let userCurrency = currency ? currency.toLowerCase() : 'usd';
       let cleanPrice = parseFloat(price);
       
-      // Khali array, card yahan se nikal diya hai
+      // Khali array (No default cards)
       let payment_methods = []; 
 
-      // --- STRICT LOCAL METHODS ONLY ---
+      // --- ONLY GUARANTEED METHODS ---
       
       if (userCurrency === 'brl') {
         payment_methods = ['pix']; // Brazil
       } 
       else if (userCurrency === 'eur') {
-        // Germany, Netherlands, Belgium, Austria, Portugal ke liye sirf local methods
-        payment_methods = ['ideal', 'bancontact', 'giropay', 'sofort', 'eps', 'multibanco'];
+        // Sirf wahi methods jo fast hain aur error nahi dete
+        payment_methods = ['ideal', 'bancontact', 'eps', 'multibanco'];
       } 
       else if (userCurrency === 'pln') {
         payment_methods = ['p24', 'blik']; // Poland
       } else {
-        // Agar koi aur currency ho toh error se bachne ke liye Pix ya iDEAL default rakh sakte hain
-        // Ya phir yahan 'card' rehne dena safe hota hai. 
-        // Lekin aapki request ke mutabiq maine card hata diya hai.
+        // Fallback: Agar koi unknown currency ho toh iDEAL dikhaye crash hone ke bajaye
         payment_methods = ['ideal']; 
       }
 
