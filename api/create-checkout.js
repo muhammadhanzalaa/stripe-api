@@ -16,23 +16,27 @@ module.exports = async (req, res) => {
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
 
-      // --- Currency Fix for Specific Countries ---
+      // --- 1. Proper Currency Logic based on Store ---
       if (urlPath.includes('-pl')) userCurrency = 'pln'; 
       else if (urlPath.includes('-se')) userCurrency = 'sek';
       else if (urlPath.includes('-dk')) userCurrency = 'dkk';
       else if (urlPath.includes('-ch')) userCurrency = 'chf';
       else if (urlPath.includes('-gb')) userCurrency = 'gbp';
 
+      // --- 2. Create Session with Automatic Filtering ---
       const session = await stripe.checkout.sessions.create({
-        // IMPORTANT: Humne payment_method_types ko puri tarah remove kar diya hai
-        // Is se error khatam ho jayega aur Stripe dashboard ki settings use karega.
+        // automatic_payment_methods use karte waqt payment_method_types ko nikalna zaroori hai
         automatic_payment_methods: { 
             enabled: true 
         }, 
         line_items: [{
           price_data: {
             currency: userCurrency,
-            product_data: { name: product_name, images: [image_url], description: variant_name },
+            product_data: { 
+                name: product_name, 
+                images: [image_url], 
+                description: variant_name 
+            },
             unit_amount: Math.round(parseFloat(price) * 100),
           },
           quantity: 1,
@@ -52,7 +56,8 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ url: session.url });
 
-    } catch (err) (
+    } catch (err) {
+      // Catch block mein bracket check kar lein
       return res.status(500).json({ error: err.message });
     }
   }
