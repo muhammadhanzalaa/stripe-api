@@ -10,58 +10,57 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      const { product_name, variant_name, image_url, price, currency } = req.body;
-      const referer = req.headers.referer || "";
-      const urlPath = referer.toLowerCase();
+      // Ab hum 'country_code' frontend se le rahe hain
+      const { product_name, variant_name, image_url, price, currency, country_code } = req.body;
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      
-      // Stable methods list for EU/Global
-      let payment_methods = ['card', 'ideal', 'bancontact', 'eps', 'multibanco', 'p24', 'blik'];
+      let final_methods = ['card']; // Default card toh hamesha rahega
 
-      // --- Currency Logic based on Store Path ---
-      if (urlPath.includes('-pl')) {
+      // --- STRICT MANUAL MAPPING ---
+      const country = country_code ? country_code.toUpperCase() : 'NL';
+
+      if (country === 'AT') {
+          final_methods = ['card', 'eps']; // Austria ke liye sirf EPS
+          userCurrency = 'eur';
+      } else if (country === 'BE') {
+          final_methods = ['card', 'bancontact']; // Belgium ke liye Bancontact
+          userCurrency = 'eur';
+      } else if (country === 'NL') {
+          final_methods = ['card', 'ideal']; // Netherlands ke liye iDEAL
+          userCurrency = 'eur';
+      } else if (country === 'PL') {
+          final_methods = ['card', 'p24', 'blik']; // Poland ke liye P24/Blik
           userCurrency = 'pln';
-      } else if (urlPath.includes('-se')) {
-          userCurrency = 'sek';
-      } else if (urlPath.includes('-dk')) {
-          userCurrency = 'dkk';
-      } else if (urlPath.includes('-ch')) {
-          userCurrency = 'chf';
-      } else if (urlPath.includes('-gb')) {
-          userCurrency = 'gbp';
+      } else if (country === 'PT') {
+          final_methods = ['card', 'multibanco'];
+          userCurrency = 'eur';
+      } else if (country === 'DE') {
+          final_methods = ['card', 'giropay'];
+          userCurrency = 'eur';
       }
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: payment_methods, 
+        payment_method_types: final_methods, 
         line_items: [{
           price_data: {
             currency: userCurrency,
-            product_data: { 
-                name: product_name, 
-                images: [image_url], 
-                description: variant_name 
-            },
+            product_data: { name: product_name, images: [image_url], description: variant_name },
             unit_amount: Math.round(parseFloat(price) * 100),
           },
           quantity: 1,
         }],
         mode: 'payment',
+        // User ne jo country select ki thi, checkout par wahi pre-fill hogi
         shipping_address_collection: { 
-            // PK removed from here
             allowed_countries: [
-              'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
-              'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
-              'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'US', 'CA', 
-              'GB', 'BR', 'AU', 'NZ', 'NO'
-            ]
+              'AT', 'BE', 'DE', 'NL', 'PL', 'PT', 'DK', 'SE', 'CH', 'US', 'GB', 'CA', 'AU'
+            ] 
         },
-        success_url: `https://lonovos.com/pages/thank-you`, 
-        cancel_url: `https://lonovos.com/`,                
+        success_url: `https://lonovos.com/pages/thank-you`,
+        cancel_url: `https://lonovos.com/`,
       });
 
       return res.status(200).json({ url: session.url });
-
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
