@@ -10,33 +10,29 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      // Ab hum 'country_code' frontend se le rahe hain
       const { product_name, variant_name, image_url, price, currency, country_code } = req.body;
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      let final_methods = ['card']; // Default card toh hamesha rahega
+      let final_methods = ['card']; 
 
-      // --- STRICT MANUAL MAPPING ---
+      // --- STRICT EU MANUAL MAPPING ---
       const country = country_code ? country_code.toUpperCase() : 'NL';
 
       if (country === 'AT') {
-          final_methods = ['card', 'eps']; // Austria ke liye sirf EPS
-          userCurrency = 'eur';
+          final_methods = ['card', 'eps']; // Austria
       } else if (country === 'BE') {
-          final_methods = ['card', 'bancontact']; // Belgium ke liye Bancontact
-          userCurrency = 'eur';
+          final_methods = ['card', 'bancontact']; // Belgium
       } else if (country === 'NL') {
-          final_methods = ['card', 'ideal']; // Netherlands ke liye iDEAL
-          userCurrency = 'eur';
+          final_methods = ['card', 'ideal']; // Netherlands
       } else if (country === 'PL') {
-          final_methods = ['card', 'p24', 'blik']; // Poland ke liye P24/Blik
+          final_methods = ['card', 'p24', 'blik']; // Poland
           userCurrency = 'pln';
       } else if (country === 'PT') {
-          final_methods = ['card', 'multibanco'];
-          userCurrency = 'eur';
+          final_methods = ['card', 'multibanco']; // Portugal
       } else if (country === 'DE') {
-          final_methods = ['card', 'giropay'];
-          userCurrency = 'eur';
+          final_methods = ['card', 'giropay']; // Germany
+      } else if (country === 'IT' || country === 'ES' || country === 'FR') {
+          final_methods = ['card']; // Standard EU Card focus
       }
 
       const session = await stripe.checkout.sessions.create({
@@ -50,10 +46,12 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
-        // User ne jo country select ki thi, checkout par wahi pre-fill hogi
         shipping_address_collection: { 
+            // FULL EU COUNTRIES LIST + GLOBAL
             allowed_countries: [
-              'AT', 'BE', 'DE', 'NL', 'PL', 'PT', 'DK', 'SE', 'CH', 'US', 'GB', 'CA', 'AU'
+              'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
+              'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
+              'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'GB', 'US', 'CA', 'AU'
             ] 
         },
         success_url: `https://lonovos.com/pages/thank-you`,
