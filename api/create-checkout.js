@@ -15,47 +15,68 @@ module.exports = async (req, res) => {
       const urlPath = referer.toLowerCase();
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      
-      // Stable methods list for EU/Global
-      let payment_methods = ['card', 'ideal', 'bancontact', 'eps', 'multibanco', 'p24', 'blik'];
+      let final_methods = ['card'];
+      let default_country = 'NL'; // Default safe option
 
-      // --- Currency Logic based on Store Path ---
-      if (urlPath.includes('-pl')) {
+      // --- 1. DYNAMIC DETECTION & STRICT FILTERING ---
+      
+      if (urlPath.includes('-at')) {
+          final_methods = ['card', 'eps']; 
+          userCurrency = 'eur';
+          default_country = 'AT';
+      } 
+      else if (urlPath.includes('-pl')) {
+          final_methods = ['card', 'p24', 'blik']; 
           userCurrency = 'pln';
-      } else if (urlPath.includes('-se')) {
-          userCurrency = 'sek';
-      } else if (urlPath.includes('-dk')) {
-          userCurrency = 'dkk';
-      } else if (urlPath.includes('-ch')) {
-          userCurrency = 'chf';
-      } else if (urlPath.includes('-gb')) {
-          userCurrency = 'gbp';
+          default_country = 'PL';
+      }
+      else if (urlPath.includes('-be')) {
+          final_methods = ['card', 'bancontact']; 
+          userCurrency = 'eur';
+          default_country = 'BE';
+      }
+      else if (urlPath.includes('-de')) {
+          final_methods = ['card', 'giropay']; // Germany specific
+          userCurrency = 'eur';
+          default_country = 'DE';
+      }
+      else if (urlPath.includes('-pt')) {
+          final_methods = ['card', 'multibanco'];
+          userCurrency = 'eur';
+          default_country = 'PT';
+      }
+      else if (urlPath.includes('-nl')) {
+          final_methods = ['card', 'ideal'];
+          userCurrency = 'eur';
+          default_country = 'NL';
       }
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: payment_methods, 
+        payment_method_types: final_methods,
+        
+        // --- 2. RESTRICT COUNTRY & SYNC DATA ---
+        shipping_address_collection: { 
+            allowed_countries: [
+              'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
+              'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
+              'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'US', 'CA', 
+              'GB', 'BR', 'AU', 'NZ'
+            ]
+        },
+
         line_items: [{
           price_data: {
             currency: userCurrency,
-            product_data: { 
-                name: product_name, 
-                images: [image_url], 
-                description: variant_name 
-            },
+            product_data: { name: product_name, images: [image_url], description: variant_name },
             unit_amount: Math.round(parseFloat(price) * 100),
           },
           quantity: 1,
         }],
         mode: 'payment',
-        shipping_address_collection: { 
-            // PK removed from here
-            allowed_countries: [
-              'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
-              'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
-              'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'US', 'CA', 
-              'GB', 'BR', 'AU', 'NZ', 'NO'
-            ]
-        },
+        
+        // Ye line ensure karegi ke payment methods country ke sath sync rahein
+        customer_creation: 'always', 
+
         success_url: `https://lonovos.com/pages/thank-you`, 
         cancel_url: `https://lonovos.com/`,                
       });
