@@ -13,31 +13,33 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, currency, country_code } = req.body;
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      let final_methods = ['card']; 
+      
+      // Basic methods jo har country mein honge (Card includes Apple/Google Pay)
+      let final_methods = ['card', 'link', 'klarna']; 
 
-      // --- STRICT EU MANUAL MAPPING (Logic preserved) ---
+      // --- STRICT EU MANUAL MAPPING (Logic Preserved & Enhanced) ---
       const country = country_code ? country_code.toUpperCase() : 'NL';
 
       if (country === 'AT') {
-          final_methods = ['card', 'eps']; 
+          final_methods = ['card', 'link', 'klarna', 'eps']; 
       } else if (country === 'BE') {
-          final_methods = ['card', 'bancontact']; 
+          final_methods = ['card', 'link', 'klarna', 'bancontact']; 
       } else if (country === 'NL') {
-          final_methods = ['card', 'ideal']; 
+          final_methods = ['card', 'link', 'klarna', 'ideal']; 
       } else if (country === 'PL') {
-          final_methods = ['card', 'p24', 'blik']; 
+          // Poland mein Klarna ki jagah P24/Blik zyada chaltay hain
+          final_methods = ['card', 'link', 'p24', 'blik']; 
           userCurrency = 'pln';
       } else if (country === 'PT') {
-          final_methods = ['card', 'multibanco']; 
+          final_methods = ['card', 'link', 'multibanco']; 
       } else if (country === 'DE') {
-          final_methods = ['card', 'giropay']; 
+          final_methods = ['card', 'link', 'klarna', 'giropay']; 
       } else if (country === 'IT' || country === 'ES' || country === 'FR') {
-          final_methods = ['card']; 
+          final_methods = ['card', 'link', 'klarna']; 
       }
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: final_methods,
-        // --- NEW: Phone Number Collection ---
         phone_number_collection: {
             enabled: true,
         },
