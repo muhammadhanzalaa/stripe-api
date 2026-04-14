@@ -16,17 +16,10 @@ module.exports = async (req, res) => {
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
       
-      // Sabse stable methods ki list
+      // Stable methods list for EU/Global
       let payment_methods = ['card', 'ideal', 'bancontact', 'eps', 'multibanco', 'p24', 'blik'];
 
-      // --- Smart Logic for Client's Requirements ---
-      
-      // 1. Agar Pakistan (PK) hai toh sirf Card dikhao
-      if (urlPath.includes('-pk')) {
-          payment_methods = ['card'];
-      }
-      
-      // 2. Poland ke liye PLN currency set karo
+      // --- Currency Logic based on Store Path ---
       if (urlPath.includes('-pl')) {
           userCurrency = 'pln';
       } else if (urlPath.includes('-se')) {
@@ -40,7 +33,6 @@ module.exports = async (req, res) => {
       }
 
       const session = await stripe.checkout.sessions.create({
-        // Purana stable parameter jo har version par chalta hai
         payment_method_types: payment_methods, 
         line_items: [{
           price_data: {
@@ -56,9 +48,9 @@ module.exports = async (req, res) => {
         }],
         mode: 'payment',
         shipping_address_collection: { 
-            // Saari EU countries + Pakistan list mein enabled hain
+            // PK removed from here
             allowed_countries: [
-              'PK', 'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
+              'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
               'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
               'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'US', 'CA', 
               'GB', 'BR', 'AU', 'NZ', 'NO'
