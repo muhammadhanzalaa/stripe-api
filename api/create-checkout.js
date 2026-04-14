@@ -29,6 +29,17 @@ module.exports = async (req, res) => {
         payment_method_types: final_methods,
         customer_email: customer_email || undefined, 
         phone_number_collection: { enabled: true },
+        
+        // --- YE HISSA AUSTRIA WALA MASLA HAL KAREGA ---
+        payment_intent_data: {
+          shipping: {
+            name: "Customer", 
+            address: {
+              country: country, // Shopify dropdown wali country yahan force hogi
+            },
+          },
+        },
+        
         line_items: [{
           price_data: {
             currency: userCurrency,
