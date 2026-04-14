@@ -16,18 +16,19 @@ module.exports = async (req, res) => {
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
 
-      // --- 1. Currency & Default Country Fix ---
+      // --- Currency Fix for Specific Countries ---
       if (urlPath.includes('-pl')) userCurrency = 'pln'; 
-      else if (urlPath.includes('-at')) userCurrency = 'eur';
+      else if (urlPath.includes('-se')) userCurrency = 'sek';
+      else if (urlPath.includes('-dk')) userCurrency = 'dkk';
+      else if (urlPath.includes('-ch')) userCurrency = 'chf';
+      else if (urlPath.includes('-gb')) userCurrency = 'gbp';
 
-      // --- 2. Create Session with Automatic Methods ---
       const session = await stripe.checkout.sessions.create({
-        // YE LINE SABSE ZAROORI HAI:
-        // Is se Stripe khud decide karega ke kis country mein konsa method dikhana hai.
-        // Agar Pakistan hai toh sirf Card dikhayega, agar Netherlands toh Card + iDEAL.
-        payment_method_types: null, 
-        automatic_payment_methods: { enabled: true }, 
-
+        // IMPORTANT: Humne payment_method_types ko puri tarah remove kar diya hai
+        // Is se error khatam ho jayega aur Stripe dashboard ki settings use karega.
+        automatic_payment_methods: { 
+            enabled: true 
+        }, 
         line_items: [{
           price_data: {
             currency: userCurrency,
@@ -51,7 +52,7 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ url: session.url });
 
-    } catch (err) {
+    } catch (err) (
       return res.status(500).json({ error: err.message });
     }
   }
