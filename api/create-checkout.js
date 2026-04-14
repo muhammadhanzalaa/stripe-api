@@ -15,25 +15,18 @@ module.exports = async (req, res) => {
       const urlPath = referer.toLowerCase();
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      let detectedCountry = 'NL'; // Default
+      let detectedCountry = 'NL'; 
 
       // --- 1. Store/Path Detection Logic ---
       if (urlPath.includes('-at')) { userCurrency = 'eur'; detectedCountry = 'AT'; }
       else if (urlPath.includes('-be')) detectedCountry = 'BE';
-      else if (urlPath.includes('-de')) detectedCountry = 'DE';
-      else if (urlPath.includes('-it')) detectedCountry = 'IT';
-      else if (urlPath.includes('-fr')) detectedCountry = 'FR';
-      else if (urlPath.includes('-es')) detectedCountry = 'ES';
-      else if (urlPath.includes('-pt')) detectedCountry = 'PT';
       else if (urlPath.includes('-pl')) { userCurrency = 'pln'; detectedCountry = 'PL'; }
-      else if (urlPath.includes('-se')) { userCurrency = 'sek'; detectedCountry = 'SE'; }
-      else if (urlPath.includes('-dk')) { userCurrency = 'dkk'; detectedCountry = 'DK'; }
-      else if (urlPath.includes('-ch')) { userCurrency = 'chf'; detectedCountry = 'CH'; }
       else if (urlPath.includes('-gb')) { userCurrency = 'gbp'; detectedCountry = 'GB'; }
       else if (urlPath.includes('-us')) { userCurrency = 'usd'; detectedCountry = 'US'; }
+      // Pakistan ke liye agar koi specific path ho toh yahan add kar sakte hain
 
       const session = await stripe.checkout.sessions.create({
-        // Card + Sab Reliable Local Methods (SEPA removed for stability)
+        // Card is must for Pakistan & Global
         payment_method_types: [
           'card', 'ideal', 'bancontact', 'eps', 'multibanco', 'p24', 'blik', 'pix'
         ],
@@ -47,9 +40,9 @@ module.exports = async (req, res) => {
         }],
         mode: 'payment',
         shipping_address_collection: { 
-            // In countries ka support add kar diya gaya hai
+            // 'PK' temporary add kar diya gaya hai
             allowed_countries: [
-              'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
+              'PK', 'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
               'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
               'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'US', 'CA', 
               'GB', 'BR', 'AU', 'NZ', 'NO'
