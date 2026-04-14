@@ -15,41 +15,31 @@ module.exports = async (req, res) => {
       const urlPath = referer.toLowerCase();
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      let detectedCountry = 'NL'; // Default
+      let detectedCountry = 'NL'; 
 
-      // --- 1. Store Detection & Currency Fix ---
-      // Austria AUD error fix
-      if (urlPath.includes('-at')) {
-          userCurrency = 'eur'; 
-          detectedCountry = 'AT';
-      }
+      // --- 1. Currency & Country Detection Logic ---
+      if (urlPath.includes('-at')) { userCurrency = 'eur'; detectedCountry = 'AT'; }
       else if (urlPath.includes('-be')) detectedCountry = 'BE';
-      else if (urlPath.includes('-nl')) detectedCountry = 'NL';
       else if (urlPath.includes('-de')) detectedCountry = 'DE';
-      else if (urlPath.includes('-pt')) detectedCountry = 'PT';
-      else if (urlPath.includes('-pl')) {
-          userCurrency = 'pln'; // Poland mandatory currency
-          detectedCountry = 'PL';
-      }
-      else if (urlPath.includes('-br')) {
-          userCurrency = 'brl';
-          detectedCountry = 'BR';
-      }
+      else if (urlPath.includes('-pl')) { userCurrency = 'pln'; detectedCountry = 'PL'; }
+      else if (urlPath.includes('-se')) { userCurrency = 'sek'; detectedCountry = 'SE'; }
+      else if (urlPath.includes('-dk')) { userCurrency = 'dkk'; detectedCountry = 'DK'; }
+      else if (urlPath.includes('-ch')) { userCurrency = 'chf'; detectedCountry = 'CH'; }
+      else if (urlPath.includes('-br')) { userCurrency = 'brl'; detectedCountry = 'BR'; }
+      else if (urlPath.includes('-gb')) { userCurrency = 'gbp'; detectedCountry = 'GB'; }
+      else if (urlPath.includes('-us')) { userCurrency = 'usd'; detectedCountry = 'US'; }
 
-      // --- 2. Dynamic Payment Methods List ---
-      // Humne card aur saare EU/Global methods ek sath bhej diye hain.
-      // Stripe user ki selection ke mutabiq khud filter karega.
       const session = await stripe.checkout.sessions.create({
+        // SEPA REMOVED: Sirf stable methods jo error nahi dete
         payment_method_types: [
-          'card',           // US/CA/GB/EU ke liye
+          'card',           // Cards for all (US/EU)
           'ideal',          // Netherlands
           'bancontact',     // Belgium
           'eps',            // Austria
           'multibanco',     // Portugal
           'p24',            // Poland
           'blik',           // Poland
-          'pix',            // Brazil
-          'sepa_debit'      // All Europe
+          'pix'             // Brazil
         ],
         line_items: [{
           price_data: {
@@ -61,11 +51,11 @@ module.exports = async (req, res) => {
         }],
         mode: 'payment',
         shipping_address_collection: { 
-            // All EU countries + North America
+            // All EU/Global Countries supported by the store
             allowed_countries: [
               'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
               'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
-              'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'US', 'CA', 'GB', 'BR'
+              'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'US', 'CA', 'GB', 'BR', 'AU', 'NZ'
             ]
         },
         success_url: `https://lonovos.com/pages/thank-you`, 
