@@ -16,16 +16,14 @@ module.exports = async (req, res) => {
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
 
-      // --- 1. Proper Currency Logic based on Store ---
+      // --- Currency Management ---
       if (urlPath.includes('-pl')) userCurrency = 'pln'; 
       else if (urlPath.includes('-se')) userCurrency = 'sek';
       else if (urlPath.includes('-dk')) userCurrency = 'dkk';
-      else if (urlPath.includes('-ch')) userCurrency = 'chf';
       else if (urlPath.includes('-gb')) userCurrency = 'gbp';
 
-      // --- 2. Create Session with Automatic Filtering ---
       const session = await stripe.checkout.sessions.create({
-        // automatic_payment_methods use karte waqt payment_method_types ko nikalna zaroori hai
+        // v14.21.0 support: automatic_payment_methods is the recommended way
         automatic_payment_methods: { 
             enabled: true 
         }, 
@@ -43,6 +41,7 @@ module.exports = async (req, res) => {
         }],
         mode: 'payment',
         shipping_address_collection: { 
+            // All requested countries
             allowed_countries: [
               'PK', 'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
               'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
@@ -57,7 +56,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ url: session.url });
 
     } catch (err) {
-      // Catch block mein bracket check kar lein
       return res.status(500).json({ error: err.message });
     }
   }
