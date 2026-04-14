@@ -15,28 +15,32 @@ module.exports = async (req, res) => {
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
       let final_methods = ['card']; 
 
-      // --- STRICT EU MANUAL MAPPING ---
+      // --- STRICT EU MANUAL MAPPING (Logic preserved) ---
       const country = country_code ? country_code.toUpperCase() : 'NL';
 
       if (country === 'AT') {
-          final_methods = ['card', 'eps']; // Austria
+          final_methods = ['card', 'eps']; 
       } else if (country === 'BE') {
-          final_methods = ['card', 'bancontact']; // Belgium
+          final_methods = ['card', 'bancontact']; 
       } else if (country === 'NL') {
-          final_methods = ['card', 'ideal']; // Netherlands
+          final_methods = ['card', 'ideal']; 
       } else if (country === 'PL') {
-          final_methods = ['card', 'p24', 'blik']; // Poland
+          final_methods = ['card', 'p24', 'blik']; 
           userCurrency = 'pln';
       } else if (country === 'PT') {
-          final_methods = ['card', 'multibanco']; // Portugal
+          final_methods = ['card', 'multibanco']; 
       } else if (country === 'DE') {
-          final_methods = ['card', 'giropay']; // Germany
+          final_methods = ['card', 'giropay']; 
       } else if (country === 'IT' || country === 'ES' || country === 'FR') {
-          final_methods = ['card']; // Standard EU Card focus
+          final_methods = ['card']; 
       }
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: final_methods, 
+        payment_method_types: final_methods,
+        // --- NEW: Phone Number Collection ---
+        phone_number_collection: {
+            enabled: true,
+        },
         line_items: [{
           price_data: {
             currency: userCurrency,
@@ -47,7 +51,6 @@ module.exports = async (req, res) => {
         }],
         mode: 'payment',
         shipping_address_collection: { 
-            // FULL EU COUNTRIES LIST + GLOBAL
             allowed_countries: [
               'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
               'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
