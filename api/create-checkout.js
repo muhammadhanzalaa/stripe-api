@@ -15,34 +15,45 @@ module.exports = async (req, res) => {
       const urlPath = referer.toLowerCase();
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
+      
+      // Stable methods list for EU/Global
+      let payment_methods = ['card', 'ideal', 'bancontact', 'eps', 'multibanco', 'p24', 'blik'];
 
-      // --- 1. Currency Sync ---
-      if (urlPath.includes('-pl')) userCurrency = 'pln';
-      else if (urlPath.includes('-gb')) userCurrency = 'gbp';
-      else if (urlPath.includes('-dk')) userCurrency = 'dkk';
-      else if (urlPath.includes('-se')) userCurrency = 'sek';
+      // --- Currency Logic based on Store Path ---
+      if (urlPath.includes('-pl')) {
+          userCurrency = 'pln';
+      } else if (urlPath.includes('-se')) {
+          userCurrency = 'sek';
+      } else if (urlPath.includes('-dk')) {
+          userCurrency = 'dkk';
+      } else if (urlPath.includes('-ch')) {
+          userCurrency = 'chf';
+      } else if (urlPath.includes('-gb')) {
+          userCurrency = 'gbp';
+      }
 
       const session = await stripe.checkout.sessions.create({
-        // YE HISSA ZAROORI HAI: Humne payment_method_types ko nikal diya hai.
-        // Ab Stripe dashboard ki settings ke mutabiq khud filter karega.
-        automatic_payment_methods: { 
-            enabled: true 
-        }, 
+        payment_method_types: payment_methods, 
         line_items: [{
           price_data: {
             currency: userCurrency,
-            product_data: { name: product_name, images: [image_url], description: variant_name },
+            product_data: { 
+                name: product_name, 
+                images: [image_url], 
+                description: variant_name 
+            },
             unit_amount: Math.round(parseFloat(price) * 100),
           },
           quantity: 1,
         }],
         mode: 'payment',
         shipping_address_collection: { 
+            // PK removed from here
             allowed_countries: [
               'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
               'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
               'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'US', 'CA', 
-              'GB', 'BR', 'AU', 'NZ'
+              'GB', 'BR', 'AU', 'NZ', 'NO'
             ]
         },
         success_url: `https://lonovos.com/pages/thank-you`, 
