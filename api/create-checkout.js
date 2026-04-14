@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
 
       const country = country_code ? country_code.toUpperCase() : 'NL';
 
-      // --- Logic Mapping (Same as before) ---
+      // --- Strict Mapping Logic ---
       if (country === 'AT') { final_methods.push('eps'); }
       else if (country === 'BE') { final_methods.push('bancontact'); }
       else if (country === 'NL') { final_methods.push('ideal'); }
@@ -27,16 +27,8 @@ module.exports = async (req, res) => {
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: final_methods,
-        customer_email: customer_email || undefined, // Email pre-fill logic
-        phone_number_collection: {
-            enabled: true,
-        },
-        // --- FIX: Default Flag based on selection ---
-        payment_method_options: {
-          card: {
-            setup_future_usage: 'none',
-          },
-        },
+        customer_email: customer_email || undefined, 
+        phone_number_collection: { enabled: true },
         line_items: [{
           price_data: {
             currency: userCurrency,
