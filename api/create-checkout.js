@@ -15,21 +15,19 @@ module.exports = async (req, res) => {
       const urlPath = referer.toLowerCase();
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      let detectedCountry = 'NL'; 
 
-      // --- 1. Store/Path Detection Logic ---
-      if (urlPath.includes('-at')) { userCurrency = 'eur'; detectedCountry = 'AT'; }
-      else if (urlPath.includes('-be')) detectedCountry = 'BE';
-      else if (urlPath.includes('-pl')) { userCurrency = 'pln'; detectedCountry = 'PL'; }
-      else if (urlPath.includes('-gb')) { userCurrency = 'gbp'; detectedCountry = 'GB'; }
-      else if (urlPath.includes('-us')) { userCurrency = 'usd'; detectedCountry = 'US'; }
-      // Pakistan ke liye agar koi specific path ho toh yahan add kar sakte hain
+      // --- 1. Currency & Default Country Fix ---
+      if (urlPath.includes('-pl')) userCurrency = 'pln'; 
+      else if (urlPath.includes('-at')) userCurrency = 'eur';
 
+      // --- 2. Create Session with Automatic Methods ---
       const session = await stripe.checkout.sessions.create({
-        // Card is must for Pakistan & Global
-        payment_method_types: [
-          'card', 'ideal', 'bancontact', 'eps', 'multibanco', 'p24', 'blik', 'pix'
-        ],
+        // YE LINE SABSE ZAROORI HAI:
+        // Is se Stripe khud decide karega ke kis country mein konsa method dikhana hai.
+        // Agar Pakistan hai toh sirf Card dikhayega, agar Netherlands toh Card + iDEAL.
+        payment_method_types: null, 
+        automatic_payment_methods: { enabled: true }, 
+
         line_items: [{
           price_data: {
             currency: userCurrency,
@@ -40,12 +38,11 @@ module.exports = async (req, res) => {
         }],
         mode: 'payment',
         shipping_address_collection: { 
-            // 'PK' temporary add kar diya gaya hai
             allowed_countries: [
               'PK', 'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
               'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
               'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'US', 'CA', 
-              'GB', 'BR', 'AU', 'NZ', 'NO'
+              'GB', 'BR', 'AU', 'NZ'
             ]
         },
         success_url: `https://lonovos.com/pages/thank-you`, 
