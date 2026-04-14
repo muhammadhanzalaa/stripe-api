@@ -10,38 +10,32 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      const { product_name, variant_name, image_url, price, currency, country_code } = req.body;
+      const { product_name, variant_name, image_url, price, currency, country_code, customer_email } = req.body;
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      
-      // Basic methods jo har country mein honge (Card includes Apple/Google Pay)
       let final_methods = ['card', 'link', 'klarna']; 
 
-      // --- STRICT EU MANUAL MAPPING (Logic Preserved & Enhanced) ---
       const country = country_code ? country_code.toUpperCase() : 'NL';
 
-      if (country === 'AT') {
-          final_methods = ['card', 'link', 'klarna', 'eps']; 
-      } else if (country === 'BE') {
-          final_methods = ['card', 'link', 'klarna', 'bancontact']; 
-      } else if (country === 'NL') {
-          final_methods = ['card', 'link', 'klarna', 'ideal']; 
-      } else if (country === 'PL') {
-          // Poland mein Klarna ki jagah P24/Blik zyada chaltay hain
-          final_methods = ['card', 'link', 'p24', 'blik']; 
-          userCurrency = 'pln';
-      } else if (country === 'PT') {
-          final_methods = ['card', 'link', 'multibanco']; 
-      } else if (country === 'DE') {
-          final_methods = ['card', 'link', 'klarna', 'giropay']; 
-      } else if (country === 'IT' || country === 'ES' || country === 'FR') {
-          final_methods = ['card', 'link', 'klarna']; 
-      }
+      // --- Logic Mapping (Same as before) ---
+      if (country === 'AT') { final_methods.push('eps'); }
+      else if (country === 'BE') { final_methods.push('bancontact'); }
+      else if (country === 'NL') { final_methods.push('ideal'); }
+      else if (country === 'PL') { final_methods = ['card', 'link', 'p24', 'blik']; userCurrency = 'pln'; }
+      else if (country === 'PT') { final_methods.push('multibanco'); }
+      else if (country === 'DE') { final_methods.push('giropay'); }
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: final_methods,
+        customer_email: customer_email || undefined, // Email pre-fill logic
         phone_number_collection: {
             enabled: true,
+        },
+        // --- FIX: Default Flag based on selection ---
+        payment_method_options: {
+          card: {
+            setup_future_usage: 'none',
+          },
         },
         line_items: [{
           price_data: {
