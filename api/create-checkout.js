@@ -15,55 +15,19 @@ module.exports = async (req, res) => {
       const urlPath = referer.toLowerCase();
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      let final_methods = ['card'];
-      let default_country = 'NL'; // Default safe option
 
-      // --- 1. DYNAMIC DETECTION & STRICT FILTERING ---
-      
-      if (urlPath.includes('-at')) {
-          final_methods = ['card', 'eps']; 
-          userCurrency = 'eur';
-          default_country = 'AT';
-      } 
-      else if (urlPath.includes('-pl')) {
-          final_methods = ['card', 'p24', 'blik']; 
-          userCurrency = 'pln';
-          default_country = 'PL';
-      }
-      else if (urlPath.includes('-be')) {
-          final_methods = ['card', 'bancontact']; 
-          userCurrency = 'eur';
-          default_country = 'BE';
-      }
-      else if (urlPath.includes('-de')) {
-          final_methods = ['card', 'giropay']; // Germany specific
-          userCurrency = 'eur';
-          default_country = 'DE';
-      }
-      else if (urlPath.includes('-pt')) {
-          final_methods = ['card', 'multibanco'];
-          userCurrency = 'eur';
-          default_country = 'PT';
-      }
-      else if (urlPath.includes('-nl')) {
-          final_methods = ['card', 'ideal'];
-          userCurrency = 'eur';
-          default_country = 'NL';
-      }
+      // --- 1. Currency Sync ---
+      if (urlPath.includes('-pl')) userCurrency = 'pln';
+      else if (urlPath.includes('-gb')) userCurrency = 'gbp';
+      else if (urlPath.includes('-dk')) userCurrency = 'dkk';
+      else if (urlPath.includes('-se')) userCurrency = 'sek';
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: final_methods,
-        
-        // --- 2. RESTRICT COUNTRY & SYNC DATA ---
-        shipping_address_collection: { 
-            allowed_countries: [
-              'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
-              'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
-              'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'US', 'CA', 
-              'GB', 'BR', 'AU', 'NZ'
-            ]
-        },
-
+        // YE HISSA ZAROORI HAI: Humne payment_method_types ko nikal diya hai.
+        // Ab Stripe dashboard ki settings ke mutabiq khud filter karega.
+        automatic_payment_methods: { 
+            enabled: true 
+        }, 
         line_items: [{
           price_data: {
             currency: userCurrency,
@@ -73,10 +37,14 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
-        
-        // Ye line ensure karegi ke payment methods country ke sath sync rahein
-        customer_creation: 'always', 
-
+        shipping_address_collection: { 
+            allowed_countries: [
+              'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
+              'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
+              'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'US', 'CA', 
+              'GB', 'BR', 'AU', 'NZ'
+            ]
+        },
         success_url: `https://lonovos.com/pages/thank-you`, 
         cancel_url: `https://lonovos.com/`,                
       });
