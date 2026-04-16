@@ -12,16 +12,17 @@ module.exports = async (req, res) => {
     try {
       const { product_name, variant_name, image_url, price, currency, country_code, customer_email } = req.body;
       
+      const country = country_code ? country_code.toUpperCase() : 'DE';
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      const country = country_code ? country_code.toUpperCase() : 'NL';
 
+      // Poland ke liye PLN currency set karna zaroori hai local methods ke liye
       if (country === 'PL') {
           userCurrency = 'pln';
       }
 
-      // --- Smart Methods Logic ---
-      // 'card' hamesha rahega taake Wallets (Apple/Google Pay) trigger ho sakein
-      let methods = ['card']; 
+      // --- Smart Restriction Logic ---
+      // Hum sirf wahi methods bhejenge jo us country mein allow hain
+      let methods = ['card', 'link']; 
 
       if (country === 'NL') { methods.push('ideal'); }
       else if (country === 'BE') { methods.push('bancontact'); }
@@ -29,24 +30,20 @@ module.exports = async (req, res) => {
       else if (country === 'PL') { methods.push('p24', 'blik'); }
       else if (country === 'PT') { methods.push('multibanco'); }
       
-      // Germany aur baqi EU ke liye Klarna add karna
-      const klarnaSupported = ['DE', 'AT', 'BE', 'NL', 'ES', 'IT', 'FR'];
+      // Germany (DE) aur baqi bade EU countries ke liye Klarna enable karna
+      const klarnaSupported = ['DE', 'AT', 'BE', 'NL', 'IT', 'ES', 'FR'];
       if (klarnaSupported.includes(country)) {
           methods.push('klarna');
       }
 
       const session = await stripe.checkout.sessions.create({
+        // 1. Manual List (Restriction ke liye)
         payment_method_types: methods,
-        
-        // --- Wallets (Apple/Google Pay) Display Fix ---
-        // 'payment_method_options' card ke andar wallets ko force karta hai
-        payment_method_options: {
-          card: {
-            request_three_d_secure: 'any',
-          },
-        },
 
-        // Is se country by-default wahi select hogi jo Shopify se aayi hai
+        // 2. Configuration ID (Wallets/Google Pay ko Link ke sath top par lane ke liye)
+        payment_method_configuration: 'pmc_1T8NtZPgLCQN2LvdTbTcDjqY',
+
+        // 3. By-default Shopify wali country select rakhne ke liye
         shipping_address_collection: { 
             allowed_countries: [country] 
         },
