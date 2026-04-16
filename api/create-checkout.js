@@ -13,45 +13,38 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, currency, country_code } = req.body;
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      const country = country_code ? country_code.toUpperCase() : 'NL';
-
-      // --- Client's Logic: Country-specific Gateways ---
       let final_methods = ['card']; 
 
+      // --- STRICT EU MANUAL MAPPING (Logic preserved) ---
+      const country = country_code ? country_code.toUpperCase() : 'NL';
+
       if (country === 'AT') {
-          final_methods = ['card', 'eps', 'klarna']; 
+          final_methods = ['card', 'eps']; 
       } else if (country === 'BE') {
-          final_methods = ['card', 'bancontact', 'klarna']; 
+          final_methods = ['card', 'bancontact']; 
       } else if (country === 'NL') {
-          final_methods = ['card', 'ideal', 'klarna']; 
+          final_methods = ['card', 'ideal']; 
       } else if (country === 'PL') {
           final_methods = ['card', 'p24', 'blik']; 
           userCurrency = 'pln';
       } else if (country === 'PT') {
           final_methods = ['card', 'multibanco']; 
       } else if (country === 'DE') {
-          // Giropay removed, Sofort and Klarna are the main ones for Germany
-          final_methods = ['card', 'sofort', 'klarna']; 
-      } else if (country === 'FR') {
-          final_methods = ['card'];
-      } else {
-          // Default for other regions
-          final_methods = ['card', 'klarna'];
+          final_methods = ['card', 'giropay']; 
+      } else if (country === 'IT' || country === 'ES' || country === 'FR') {
+          final_methods = ['card']; 
       }
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: final_methods, 
+        payment_method_types: final_methods,
+        // --- NEW: Phone Number Collection ---
         phone_number_collection: {
             enabled: true,
         },
         line_items: [{
           price_data: {
             currency: userCurrency,
-            product_data: { 
-              name: product_name, 
-              images: [image_url], 
-              description: variant_name 
-            },
+            product_data: { name: product_name, images: [image_url], description: variant_name },
             unit_amount: Math.round(parseFloat(price) * 100),
           },
           quantity: 1,
@@ -70,7 +63,6 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ url: session.url });
     } catch (err) {
-      // Return specific error message for debugging
       return res.status(500).json({ error: err.message });
     }
   }
