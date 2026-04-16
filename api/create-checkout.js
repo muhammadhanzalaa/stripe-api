@@ -19,23 +19,35 @@ module.exports = async (req, res) => {
           userCurrency = 'pln';
       }
 
+      // --- Smart Restriction Logic ---
+      // Hum 'card' ko hamesha enable rakhenge (Apple/Google Pay ke liye)
+      // Baqi specific methods ko sirf related country ke liye append karenge.
+      
+      let restricted_methods = ['card'];
+
+      if (country === 'NL') {
+          restricted_methods.push('ideal');
+      } else if (country === 'BE') {
+          restricted_methods.push('bancontact');
+      } else if (country === 'AT') {
+          restricted_methods.push('eps');
+      } else if (country === 'PL') {
+          restricted_methods.push('p24', 'blik');
+      } else if (country === 'PT') {
+          restricted_methods.push('multibanco');
+      } 
+      // Germany ke liye Sofort/Klarna use kar sakte hain agar on hain
+      // else if (country === 'DE') { restricted_methods.push('sofort'); }
+
+      // Default rules: related regions mein Klarna allow karna
+      const euCountriesWithKlarna = ['AT', 'BE', 'DK', 'FI', 'FR', 'DE', 'IT', 'NL', 'NO', 'ES', 'SE', 'CH', 'GB'];
+      if (euCountriesWithKlarna.includes(country)) {
+          restricted_methods.push('klarna');
+      }
+
       const session = await stripe.checkout.sessions.create({
-        /* Apple Pay aur Google Pay automatically 'card' ke saath enable ho jate hain 
-           agar wo Stripe Dashboard par on hon. Inhein alag se list mein likhne ki 
-           zaroorat nahi hoti (likhne par error aa sakta hai).
-        */
-        payment_method_types: [
-          'card', 
-          'ideal', 
-          'bancontact', 
-          'eps', 
-          'p24', 
-          'blik', 
-          'multibanco', 
-          'klarna', 
-          'afterpay_clearpay',
-          'link'
-        ],
+        // Ab manual restrict kar di list taake Portugal mein iDEAL na dikhe
+        payment_method_types: restricted_methods, 
 
         phone_number_collection: {
             enabled: true,
