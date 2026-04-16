@@ -14,11 +14,13 @@ module.exports = async (req, res) => {
       
       const country = country_code ? country_code.toUpperCase() : 'DE';
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
+
+      // Poland ke liye PLN lazmi hai warna local methods error denge
       if (country === 'PL') { userCurrency = 'pln'; }
 
       const session = await stripe.checkout.sessions.create({
-        // SIRF configuration ID use hogi, types nahi
-        payment_method_configuration: 'pmc_1T8NtZPgLCQN2LvdTbTcDjqY',
+        // --- 1. Sab configurations ab Dashboard se control hongi ---
+        // Na ID di hai, na types list. Stripe automatic default pick karega.
 
         shipping_address_collection: { 
             allowed_countries: [country] 
