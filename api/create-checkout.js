@@ -15,9 +15,28 @@ module.exports = async (req, res) => {
       const country = country_code ? country_code.toUpperCase() : 'DE';
       let userCurrency = (country === 'PL') ? 'pln' : (currency ? currency.toLowerCase() : 'eur');
 
+      // --- FORCED METHODS LIST ---
+      // Hum yahan Stripe ko batayege ke ye methods lazmi load karein
+      let methods = ['card', 'link', 'klarna']; 
+
+      if (country === 'NL') { methods.push('ideal'); }
+      else if (country === 'BE') { methods.push('bancontact'); }
+      else if (country === 'AT') { methods.push('eps'); }
+      else if (country === 'PL') { methods.push('p24', 'blik'); }
+
       const session = await stripe.checkout.sessions.create({
-        // Ye ID aapke dashboard se Link aur baki methods ko connect rakhti hai
-        payment_method_configuration: 'pmc_1T8NtZPgLCQN2LvdTbTcDjqY',
+        // Manual list bhej rahe hain
+        payment_method_types: methods,
+
+        // Wallets (Google/Apple Pay) ko card flow ke sath force karna
+        payment_method_options: {
+          card: {
+            request_three_d_secure: 'any',
+          },
+          klarna: {
+            setup_future_usage: 'none',
+          }
+        },
 
         shipping_address_collection: { 
             allowed_countries: [country] 
@@ -29,7 +48,11 @@ module.exports = async (req, res) => {
         line_items: [{
           price_data: {
             currency: userCurrency,
-            product_data: { name: product_name, images: [image_url], description: variant_name },
+            product_data: { 
+              name: product_name, 
+              images: [image_url], 
+              description: variant_name 
+            },
             unit_amount: Math.round(parseFloat(price) * 100),
           },
           quantity: 1,
