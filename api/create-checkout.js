@@ -19,37 +19,39 @@ module.exports = async (req, res) => {
           userCurrency = 'pln';
       }
 
-      // --- 1. Wallet Support (Apple/Google Pay) ---
-      // Apple Pay/Google Pay ke liye Dashboard par 'automatic_payment_methods' behtar hai,
-      // lekin restriction ke liye hum isse ID se connect karenge.
-      
+      // --- Smart Methods Logic ---
+      // 'card' hamesha rahega taake Wallets (Apple/Google Pay) trigger ho sakein
       let methods = ['card']; 
 
-      // --- 2. Country-wise Restriction Logic ---
       if (country === 'NL') { methods.push('ideal'); }
       else if (country === 'BE') { methods.push('bancontact'); }
       else if (country === 'AT') { methods.push('eps'); }
       else if (country === 'PL') { methods.push('p24', 'blik'); }
       else if (country === 'PT') { methods.push('multibanco'); }
-
-      // EU Countries ke liye Klarna
-      const klarnaCountries = ['AT', 'BE', 'DE', 'ES', 'FR', 'IT', 'NL', 'PL', 'PT'];
-      if (klarnaCountries.includes(country)) {
+      
+      // Germany aur baqi EU ke liye Klarna add karna
+      const klarnaSupported = ['DE', 'AT', 'BE', 'NL', 'ES', 'IT', 'FR'];
+      if (klarnaSupported.includes(country)) {
           methods.push('klarna');
       }
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
         
-        // --- 3. Default Country Fix ---
-        // Is se Shopify wali country by-default Checkout par select ho jayegi
+        // --- Wallets (Apple/Google Pay) Display Fix ---
+        // 'payment_method_options' card ke andar wallets ko force karta hai
+        payment_method_options: {
+          card: {
+            request_three_d_secure: 'any',
+          },
+        },
+
+        // Is se country by-default wahi select hogi jo Shopify se aayi hai
         shipping_address_collection: { 
             allowed_countries: [country] 
         },
 
-        // Email pass karne se Stripe customer ki identity jaldi recognize karta hai
         customer_email: customer_email || undefined,
-
         phone_number_collection: { enabled: true },
         
         line_items: [{
