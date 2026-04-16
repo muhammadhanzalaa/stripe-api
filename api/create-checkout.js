@@ -1,9 +1,3 @@
-
-
-
-
-
-
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 module.exports = async (req, res) => {
@@ -18,42 +12,39 @@ module.exports = async (req, res) => {
     try {
       const { product_name, variant_name, image_url, price, currency, country_code } = req.body;
       
+      // Default currency logic (sirf Poland ke liye PLN rakha hai baqi orders ke liye bypass logic)
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      let final_methods = ['card']; 
-
-      // --- STRICT EU MANUAL MAPPING ---
       const country = country_code ? country_code.toUpperCase() : 'NL';
 
-      if (country === 'AT') {
-          final_methods = ['card', 'eps']; // Austria
-      } else if (country === 'BE') {
-          final_methods = ['card', 'bancontact']; // Belgium
-      } else if (country === 'NL') {
-          final_methods = ['card', 'ideal']; // Netherlands
-      } else if (country === 'PL') {
-          final_methods = ['card', 'p24', 'blik']; // Poland
+      if (country === 'PL') {
           userCurrency = 'pln';
-      } else if (country === 'PT') {
-          final_methods = ['card', 'multibanco']; // Portugal
-      } else if (country === 'DE') {
-          final_methods = ['card', 'giropay']; // Germany
-      } else if (country === 'IT' || country === 'ES' || country === 'FR') {
-          final_methods = ['card']; // Standard EU Card focus
       }
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: final_methods, 
+        // 1. Manual restriction hata di, ab Stripe dashboard handle karega
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        // 2. Aapki Default Configuration ID jo dashboard par active hai
+        payment_method_configuration: 'pmc_1T8NtZPgLCQN2LvdTbTcDjqY',
+
+        phone_number_collection: {
+            enabled: true,
+        },
         line_items: [{
           price_data: {
             currency: userCurrency,
-            product_data: { name: product_name, images: [image_url], description: variant_name },
+            product_data: { 
+              name: product_name, 
+              images: [image_url], 
+              description: variant_name 
+            },
             unit_amount: Math.round(parseFloat(price) * 100),
           },
           quantity: 1,
         }],
         mode: 'payment',
         shipping_address_collection: { 
-            // FULL EU COUNTRIES LIST + GLOBAL
             allowed_countries: [
               'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
               'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
