@@ -1,3 +1,9 @@
+
+
+
+
+
+
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 module.exports = async (req, res) => {
@@ -15,32 +21,28 @@ module.exports = async (req, res) => {
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
       let final_methods = ['card']; 
 
-      // --- STRICT EU MANUAL MAPPING (Logic preserved) ---
+      // --- STRICT EU MANUAL MAPPING ---
       const country = country_code ? country_code.toUpperCase() : 'NL';
 
       if (country === 'AT') {
-          final_methods = ['card', 'eps']; 
+          final_methods = ['card', 'eps']; // Austria
       } else if (country === 'BE') {
-          final_methods = ['card', 'bancontact']; 
+          final_methods = ['card', 'bancontact']; // Belgium
       } else if (country === 'NL') {
-          final_methods = ['card', 'ideal']; 
+          final_methods = ['card', 'ideal']; // Netherlands
       } else if (country === 'PL') {
-          final_methods = ['card', 'p24', 'blik']; 
+          final_methods = ['card', 'p24', 'blik']; // Poland
           userCurrency = 'pln';
       } else if (country === 'PT') {
-          final_methods = ['card', 'multibanco']; 
+          final_methods = ['card', 'multibanco']; // Portugal
       } else if (country === 'DE') {
-          final_methods = ['card', 'giropay']; 
+          final_methods = ['card', 'giropay']; // Germany
       } else if (country === 'IT' || country === 'ES' || country === 'FR') {
-          final_methods = ['card']; 
+          final_methods = ['card']; // Standard EU Card focus
       }
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: final_methods,
-        // --- NEW: Phone Number Collection ---
-        phone_number_collection: {
-            enabled: true,
-        },
+        payment_method_types: final_methods, 
         line_items: [{
           price_data: {
             currency: userCurrency,
@@ -51,6 +53,7 @@ module.exports = async (req, res) => {
         }],
         mode: 'payment',
         shipping_address_collection: { 
+            // FULL EU COUNTRIES LIST + GLOBAL
             allowed_countries: [
               'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
               'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
