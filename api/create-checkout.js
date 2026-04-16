@@ -13,33 +13,11 @@ module.exports = async (req, res) => {
       const { product_name, variant_name, image_url, price, currency, country_code, customer_email } = req.body;
       
       const country = country_code ? country_code.toUpperCase() : 'DE';
-      let userCurrency = currency ? currency.toLowerCase() : 'eur';
-      if (country === 'PL') { userCurrency = 'pln'; }
-
-      // --- 1. Manual Methods List (Forcing Everything) ---
-      // Hum yahan wo saare methods likh rahe hain jo client ko chahiye
-      let methods = ['card', 'link', 'klarna']; 
-
-      if (country === 'NL') { methods.push('ideal'); }
-      else if (country === 'BE') { methods.push('bancontact'); }
-      else if (country === 'AT') { methods.push('eps'); }
-      else if (country === 'PL') { methods.push('p24', 'blik'); }
-      else if (country === 'PT') { methods.push('multibanco'); }
+      let userCurrency = (country === 'PL') ? 'pln' : (currency ? currency.toLowerCase() : 'eur');
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: methods,
-
-        // --- 2. WALLETS FORCE (Google Pay / Apple Pay) ---
-        // Ye code Stripe ko majboor karta hai ke wo card ke sath wallets bhi dikhaye
-        payment_method_options: {
-          card: {
-            request_three_d_secure: 'any',
-          },
-          // Google Pay aur Apple Pay ke liye extra wallets support
-          klarna: {
-            setup_future_usage: 'none',
-          }
-        },
+        // Ye ID aapke dashboard se Link aur baki methods ko connect rakhti hai
+        payment_method_configuration: 'pmc_1T8NtZPgLCQN2LvdTbTcDjqY',
 
         shipping_address_collection: { 
             allowed_countries: [country] 
@@ -51,11 +29,7 @@ module.exports = async (req, res) => {
         line_items: [{
           price_data: {
             currency: userCurrency,
-            product_data: { 
-              name: product_name, 
-              images: [image_url], 
-              description: variant_name 
-            },
+            product_data: { name: product_name, images: [image_url], description: variant_name },
             unit_amount: Math.round(parseFloat(price) * 100),
           },
           quantity: 1,
