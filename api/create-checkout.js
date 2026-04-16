@@ -22,10 +22,11 @@ module.exports = async (req, res) => {
 
       const country = country_code ? country_code.toUpperCase() : 'DE';
 
-      // ✅ SAFE CURRENCY LOGIC
+      // ✅ SAFE CURRENCY LOGIC (Added India INR logic)
       let userCurrency = 'eur';
 
       if (country === 'PL') userCurrency = 'pln';
+      else if (country === 'IN') userCurrency = 'inr'; // India ke liye INR lazmi hai
       else if (currency) userCurrency = currency.toLowerCase();
 
       // ✅ BASE METHODS
@@ -38,21 +39,27 @@ module.exports = async (req, res) => {
         methods.push('klarna');
       }
 
-      // ✅ COUNTRY SPECIFIC METHODS
+      // ✅ COUNTRY SPECIFIC METHODS (Added India UPI)
       if (country === 'NL') methods.push('ideal');
       else if (country === 'BE') methods.push('bancontact');
       else if (country === 'AT') methods.push('eps');
       else if (country === 'PL') methods.push('p24', 'blik');
       else if (country === 'PT') methods.push('multibanco');
+      else if (country === 'IN') methods.push('upi'); // UPI enable kar diya
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
 
-        // ✅ IMPORTANT: billing required for Klarna
         billing_address_collection: 'required',
 
         shipping_address_collection: {
-          allowed_countries: [country]
+          // India (IN) ko list mein add kar diya hai
+          allowed_countries: [
+            'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
+            'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
+            'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'GB', 'US', 
+            'CA', 'AU', 'IN'
+          ]
         },
 
         customer_email: customer_email || undefined,
