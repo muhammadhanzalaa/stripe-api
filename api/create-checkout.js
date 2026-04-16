@@ -14,36 +14,12 @@ module.exports = async (req, res) => {
       
       const country = country_code ? country_code.toUpperCase() : 'DE';
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-
-      // Poland ke liye PLN currency set karna zaroori hai local methods ke liye
-      if (country === 'PL') {
-          userCurrency = 'pln';
-      }
-
-      // --- Smart Restriction Logic ---
-      // Hum sirf wahi methods bhejenge jo us country mein allow hain
-      let methods = ['card', 'link']; 
-
-      if (country === 'NL') { methods.push('ideal'); }
-      else if (country === 'BE') { methods.push('bancontact'); }
-      else if (country === 'AT') { methods.push('eps'); }
-      else if (country === 'PL') { methods.push('p24', 'blik'); }
-      else if (country === 'PT') { methods.push('multibanco'); }
-      
-      // Germany (DE) aur baqi bade EU countries ke liye Klarna enable karna
-      const klarnaSupported = ['DE', 'AT', 'BE', 'NL', 'IT', 'ES', 'FR'];
-      if (klarnaSupported.includes(country)) {
-          methods.push('klarna');
-      }
+      if (country === 'PL') { userCurrency = 'pln'; }
 
       const session = await stripe.checkout.sessions.create({
-        // 1. Manual List (Restriction ke liye)
-        payment_method_types: methods,
-
-        // 2. Configuration ID (Wallets/Google Pay ko Link ke sath top par lane ke liye)
+        // SIRF configuration ID use hogi, types nahi
         payment_method_configuration: 'pmc_1T8NtZPgLCQN2LvdTbTcDjqY',
 
-        // 3. By-default Shopify wali country select rakhne ke liye
         shipping_address_collection: { 
             allowed_countries: [country] 
         },
