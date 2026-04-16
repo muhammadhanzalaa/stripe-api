@@ -20,40 +20,36 @@ module.exports = async (req, res) => {
         customer_email
       } = req.body;
 
-      const country = country_code ? country_code.toUpperCase() : 'DE';
+      // ✅ AB INDIA DEFAULT AYEGA AGAR FRONTEND SE CODE NA MILA TO
+      const country = country_code ? country_code.toUpperCase() : 'IN';
 
-      // ✅ SAFE CURRENCY LOGIC (Added India INR logic)
+      // ✅ SAFE CURRENCY LOGIC
       let userCurrency = 'eur';
 
       if (country === 'PL') userCurrency = 'pln';
-      else if (country === 'IN') userCurrency = 'inr'; // India ke liye INR lazmi hai
+      else if (country === 'IN') userCurrency = 'inr'; 
       else if (currency) userCurrency = currency.toLowerCase();
 
       // ✅ BASE METHODS
       let methods = ['card', 'link'];
 
-      // ✅ ADD KLARNA ONLY IF SUPPORTED
       const klarnaSupportedCurrencies = ['eur', 'usd', 'gbp'];
-
       if (klarnaSupportedCurrencies.includes(userCurrency)) {
         methods.push('klarna');
       }
 
-      // ✅ COUNTRY SPECIFIC METHODS (Added India UPI)
+      // ✅ COUNTRY SPECIFIC METHODS
       if (country === 'NL') methods.push('ideal');
       else if (country === 'BE') methods.push('bancontact');
       else if (country === 'AT') methods.push('eps');
       else if (country === 'PL') methods.push('p24', 'blik');
       else if (country === 'PT') methods.push('multibanco');
-      else if (country === 'IN') methods.push('upi'); // UPI enable kar diya
+      else if (country === 'IN') methods.push('upi'); 
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
-
         billing_address_collection: 'required',
-
         shipping_address_collection: {
-          // India (IN) ko list mein add kar diya hai
           allowed_countries: [
             'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
             'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
@@ -61,30 +57,21 @@ module.exports = async (req, res) => {
             'CA', 'AU', 'IN'
           ]
         },
-
         customer_email: customer_email || undefined,
-
-        phone_number_collection: {
-          enabled: true
-        },
-
-        line_items: [
-          {
-            price_data: {
-              currency: userCurrency,
-              product_data: {
-                name: product_name,
-                images: [image_url],
-                description: variant_name
-              },
-              unit_amount: Math.round(parseFloat(price) * 100)
+        phone_number_collection: { enabled: true },
+        line_items: [{
+          price_data: {
+            currency: userCurrency,
+            product_data: {
+              name: product_name,
+              images: [image_url],
+              description: variant_name
             },
-            quantity: 1
-          }
-        ],
-
+            unit_amount: Math.round(parseFloat(price) * 100)
+          },
+          quantity: 1
+        }],
         mode: 'payment',
-
         success_url: `https://lonovos.com/pages/thank-you`,
         cancel_url: `https://lonovos.com/`
       });
