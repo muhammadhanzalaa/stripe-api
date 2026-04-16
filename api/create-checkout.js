@@ -20,12 +20,14 @@ module.exports = async (req, res) => {
         customer_email
       } = req.body;
 
+      // Product page se jo code aayega wahi use hoga
       const country = country_code ? country_code.toUpperCase() : 'DE';
 
       // ✅ SAFE CURRENCY LOGIC
       let userCurrency = 'eur';
 
       if (country === 'PL') userCurrency = 'pln';
+      else if (country === 'IN') userCurrency = 'inr'; // India ke liye INR
       else if (currency) userCurrency = currency.toLowerCase();
 
       // ✅ BASE METHODS
@@ -44,13 +46,20 @@ module.exports = async (req, res) => {
       else if (country === 'AT') methods.push('eps');
       else if (country === 'PL') methods.push('p24', 'blik');
       else if (country === 'PT') methods.push('multibanco');
+      else if (country === 'IN') methods.push('upi'); // India ke liye UPI add kar diya
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
 
-        // ✅ IMPORTANT: billing required for Klarna
         billing_address_collection: 'required',
 
+        // ✅ ENABLE STATE/REGION OPTION
+        // Is se address mein State ka option nazar aayega
+        custom_text: {
+            shipping_address_牽: {message: "Please provide your full state/region for delivery."},
+        },
+        
+        // Is line se State/Province lazmi ho jata hai address field mein
         shipping_address_collection: {
           allowed_countries: [country]
         },
@@ -77,6 +86,9 @@ module.exports = async (req, res) => {
         ],
 
         mode: 'payment',
+        
+        // Is se billing address mein state field trigger hoti hai
+        automatic_tax: { enabled: false }, 
 
         success_url: `https://lonovos.com/pages/thank-you`,
         cancel_url: `https://lonovos.com/`
