@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      const { product_name, variant_name, image_url, price, currency, country_code } = req.body;
+      const { product_name, variant_name, image_url, price, currency, country_code, customer_email } = req.body;
       
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
       const country = country_code ? country_code.toUpperCase() : 'NL';
@@ -19,39 +19,39 @@ module.exports = async (req, res) => {
           userCurrency = 'pln';
       }
 
-      // --- Smart Restriction Logic ---
-      // Hum 'card' ko hamesha enable rakhenge (Apple/Google Pay ke liye)
-      // Baqi specific methods ko sirf related country ke liye append karenge.
+      // --- 1. Wallet Support (Apple/Google Pay) ---
+      // Apple Pay/Google Pay ke liye Dashboard par 'automatic_payment_methods' behtar hai,
+      // lekin restriction ke liye hum isse ID se connect karenge.
       
-      let restricted_methods = ['card'];
+      let methods = ['card']; 
 
-      if (country === 'NL') {
-          restricted_methods.push('ideal');
-      } else if (country === 'BE') {
-          restricted_methods.push('bancontact');
-      } else if (country === 'AT') {
-          restricted_methods.push('eps');
-      } else if (country === 'PL') {
-          restricted_methods.push('p24', 'blik');
-      } else if (country === 'PT') {
-          restricted_methods.push('multibanco');
-      } 
-      // Germany ke liye Sofort/Klarna use kar sakte hain agar on hain
-      // else if (country === 'DE') { restricted_methods.push('sofort'); }
+      // --- 2. Country-wise Restriction Logic ---
+      if (country === 'NL') { methods.push('ideal'); }
+      else if (country === 'BE') { methods.push('bancontact'); }
+      else if (country === 'AT') { methods.push('eps'); }
+      else if (country === 'PL') { methods.push('p24', 'blik'); }
+      else if (country === 'PT') { methods.push('multibanco'); }
 
-      // Default rules: related regions mein Klarna allow karna
-      const euCountriesWithKlarna = ['AT', 'BE', 'DK', 'FI', 'FR', 'DE', 'IT', 'NL', 'NO', 'ES', 'SE', 'CH', 'GB'];
-      if (euCountriesWithKlarna.includes(country)) {
-          restricted_methods.push('klarna');
+      // EU Countries ke liye Klarna
+      const klarnaCountries = ['AT', 'BE', 'DE', 'ES', 'FR', 'IT', 'NL', 'PL', 'PT'];
+      if (klarnaCountries.includes(country)) {
+          methods.push('klarna');
       }
 
       const session = await stripe.checkout.sessions.create({
-        // Ab manual restrict kar di list taake Portugal mein iDEAL na dikhe
-        payment_method_types: restricted_methods, 
-
-        phone_number_collection: {
-            enabled: true,
+        payment_method_types: methods,
+        
+        // --- 3. Default Country Fix ---
+        // Is se Shopify wali country by-default Checkout par select ho jayegi
+        shipping_address_collection: { 
+            allowed_countries: [country] 
         },
+
+        // Email pass karne se Stripe customer ki identity jaldi recognize karta hai
+        customer_email: customer_email || undefined,
+
+        phone_number_collection: { enabled: true },
+        
         line_items: [{
           price_data: {
             currency: userCurrency,
@@ -65,13 +65,6 @@ module.exports = async (req, res) => {
           quantity: 1,
         }],
         mode: 'payment',
-        shipping_address_collection: { 
-            allowed_countries: [
-              'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 
-              'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 
-              'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH', 'GB', 'US', 'CA', 'AU'
-            ] 
-        },
         success_url: `https://lonovos.com/pages/thank-you`,
         cancel_url: `https://lonovos.com/`,
       });
