@@ -20,22 +20,18 @@ module.exports = async (req, res) => {
         customer_email
       } = req.body;
 
-      // Product page se jo code aayega wahi use hoga
       const country = country_code ? country_code.toUpperCase() : 'DE';
 
       // ✅ SAFE CURRENCY LOGIC
       let userCurrency = 'eur';
-
       if (country === 'PL') userCurrency = 'pln';
-      else if (country === 'IN') userCurrency = 'inr'; // India ke liye INR
+      else if (country === 'IN') userCurrency = 'inr'; 
       else if (currency) userCurrency = currency.toLowerCase();
 
       // ✅ BASE METHODS
       let methods = ['card', 'link'];
 
-      // ✅ ADD KLARNA ONLY IF SUPPORTED
       const klarnaSupportedCurrencies = ['eur', 'usd', 'gbp'];
-
       if (klarnaSupportedCurrencies.includes(userCurrency)) {
         methods.push('klarna');
       }
@@ -46,50 +42,36 @@ module.exports = async (req, res) => {
       else if (country === 'AT') methods.push('eps');
       else if (country === 'PL') methods.push('p24', 'blik');
       else if (country === 'PT') methods.push('multibanco');
-      else if (country === 'IN') methods.push('upi'); // India ke liye UPI add kar diya
+      else if (country === 'IN') methods.push('upi'); 
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
-
         billing_address_collection: 'required',
 
-        // ✅ ENABLE STATE/REGION OPTION
-        // Is se address mein State ka option nazar aayega
-        custom_text: {
-            shipping_address_牽: {message: "Please provide your full state/region for delivery."},
-        },
-        
-        // Is line se State/Province lazmi ho jata hai address field mein
+        // ✅ FIXED STATE OPTION
+        // Stripe automatic state/province field dikhata hai jab billing_address_collection required ho.
+        // India, US, Canada ke liye ye field dropdown ban jayegi.
         shipping_address_collection: {
           allowed_countries: [country]
         },
 
         customer_email: customer_email || undefined,
+        phone_number_collection: { enabled: true },
 
-        phone_number_collection: {
-          enabled: true
-        },
-
-        line_items: [
-          {
-            price_data: {
-              currency: userCurrency,
-              product_data: {
-                name: product_name,
-                images: [image_url],
-                description: variant_name
-              },
-              unit_amount: Math.round(parseFloat(price) * 100)
+        line_items: [{
+          price_data: {
+            currency: userCurrency,
+            product_data: {
+              name: product_name,
+              images: [image_url],
+              description: variant_name
             },
-            quantity: 1
-          }
-        ],
+            unit_amount: Math.round(parseFloat(price) * 100)
+          },
+          quantity: 1
+        }],
 
         mode: 'payment',
-        
-        // Is se billing address mein state field trigger hoti hai
-        automatic_tax: { enabled: false }, 
-
         success_url: `https://lonovos.com/pages/thank-you`,
         cancel_url: `https://lonovos.com/`
       });
@@ -97,7 +79,8 @@ module.exports = async (req, res) => {
       return res.status(200).json({ url: session.url });
 
     } catch (err) {
-      return res.status(500).json({ error: err.message });
+      // ✅ Agar ab bhi error aaye toh ye exact Stripe error message dikhayega
+      return res.status(400).json({ error: err.message });
     }
   }
 };
