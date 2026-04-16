@@ -15,20 +15,22 @@ module.exports = async (req, res) => {
       const country = country_code ? country_code.toUpperCase() : 'DE';
       let userCurrency = (country === 'PL') ? 'pln' : (currency ? currency.toLowerCase() : 'eur');
 
-      // --- FORCED METHODS LIST ---
-      // Hum yahan Stripe ko batayege ke ye methods lazmi load karein
+      // --- GLOBAL FORCED METHODS ---
+      // 'card' ke sath Google Pay/Apple Pay automatic trigger hote hain
+      // 'klarna' aur 'link' ko humne global list mein dal diya hai
       let methods = ['card', 'link', 'klarna']; 
 
+      // --- COUNTRY SPECIFIC EXTRA METHODS ---
       if (country === 'NL') { methods.push('ideal'); }
       else if (country === 'BE') { methods.push('bancontact'); }
       else if (country === 'AT') { methods.push('eps'); }
       else if (country === 'PL') { methods.push('p24', 'blik'); }
+      else if (country === 'PT') { methods.push('multibanco'); }
 
       const session = await stripe.checkout.sessions.create({
-        // Manual list bhej rahe hain
         payment_method_types: methods,
 
-        // Wallets (Google/Apple Pay) ko card flow ke sath force karna
+        // Wallets ko display karwane ke liye important options
         payment_method_options: {
           card: {
             request_three_d_secure: 'any',
