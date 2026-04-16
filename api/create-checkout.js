@@ -15,8 +15,7 @@ module.exports = async (req, res) => {
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
       const country = country_code ? country_code.toUpperCase() : 'NL';
 
-      // --- Client ki Shart: Country wise Gateways ---
-      // Yahan hum wo tamam methods add kar rahe hain jo aapne dashboard par on kiye hain
+      // --- Client's Logic: Country-specific Gateways ---
       let final_methods = ['card']; 
 
       if (country === 'AT') {
@@ -31,18 +30,17 @@ module.exports = async (req, res) => {
       } else if (country === 'PT') {
           final_methods = ['card', 'multibanco']; 
       } else if (country === 'DE') {
-          final_methods = ['card', 'giropay', 'sofort', 'klarna']; 
+          // Giropay removed, Sofort and Klarna are the main ones for Germany
+          final_methods = ['card', 'sofort', 'klarna']; 
       } else if (country === 'FR') {
-          final_methods = ['card', 'cartes_bancaires'];
+          final_methods = ['card'];
       } else {
-          // Default for other EU/US countries
-          final_methods = ['card', 'klarna', 'afterpay_clearpay'];
+          // Default for other regions
+          final_methods = ['card', 'klarna'];
       }
 
       const session = await stripe.checkout.sessions.create({
-        // automatic_payment_methods ko hata diya taake error na aaye
         payment_method_types: final_methods, 
-        
         phone_number_collection: {
             enabled: true,
         },
@@ -72,6 +70,7 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ url: session.url });
     } catch (err) {
+      // Return specific error message for debugging
       return res.status(500).json({ error: err.message });
     }
   }
