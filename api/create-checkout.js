@@ -12,7 +12,6 @@ module.exports = async (req, res) => {
     try {
       const { product_name, variant_name, image_url, price, currency, country_code } = req.body;
       
-      // Default currency logic (sirf Poland ke liye PLN rakha hai baqi orders ke liye bypass logic)
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
       const country = country_code ? country_code.toUpperCase() : 'NL';
 
@@ -21,11 +20,8 @@ module.exports = async (req, res) => {
       }
 
       const session = await stripe.checkout.sessions.create({
-        // 1. Manual restriction hata di, ab Stripe dashboard handle karega
-        automatic_payment_methods: {
-          enabled: true,
-        },
-        // 2. Aapki Default Configuration ID jo dashboard par active hai
+        // 1. automatic_payment_methods nikal diya taake error khatam ho jaye
+        // 2. Is ID ke andar dashboard par saare methods pehle se on hain
         payment_method_configuration: 'pmc_1T8NtZPgLCQN2LvdTbTcDjqY',
 
         phone_number_collection: {
