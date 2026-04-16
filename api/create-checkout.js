@@ -1,6 +1,7 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 module.exports = async (req, res) => {
+  // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -12,16 +13,20 @@ module.exports = async (req, res) => {
     try {
       const { product_name, variant_name, image_url, price, currency, country_code } = req.body;
       
+      // Default currency and country setup
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
       const country = country_code ? country_code.toUpperCase() : 'NL';
 
+      // Poland ke liye PLN currency lazmi hai gateways show karne ke liye
       if (country === 'PL') {
           userCurrency = 'pln';
       }
 
       const session = await stripe.checkout.sessions.create({
-        // 1. automatic_payment_methods nikal diya taake error khatam ho jaye
-        // 2. Is ID ke andar dashboard par saare methods pehle se on hain
+        /* Kyunke apka SDK purana hai, isliye hum 'automatic_payment_methods' nikal rahe hain.
+           Sirf niche wali Configuration ID hi dashboard se saare methods utha legi 
+           aur IP ke mutabiq show karegi.
+        */
         payment_method_configuration: 'pmc_1T8NtZPgLCQN2LvdTbTcDjqY',
 
         phone_number_collection: {
@@ -51,8 +56,11 @@ module.exports = async (req, res) => {
         cancel_url: `https://lonovos.com/`,
       });
 
+      // Checkout URL return karna
       return res.status(200).json({ url: session.url });
+      
     } catch (err) {
+      console.error("Stripe Error:", err.message);
       return res.status(500).json({ error: err.message });
     }
   }
