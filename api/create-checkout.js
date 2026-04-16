@@ -14,13 +14,32 @@ module.exports = async (req, res) => {
       
       const country = country_code ? country_code.toUpperCase() : 'DE';
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
-
-      // Poland ke liye PLN lazmi hai warna local methods error denge
       if (country === 'PL') { userCurrency = 'pln'; }
 
+      // --- 1. Manual Methods List (Forcing Everything) ---
+      // Hum yahan wo saare methods likh rahe hain jo client ko chahiye
+      let methods = ['card', 'link', 'klarna']; 
+
+      if (country === 'NL') { methods.push('ideal'); }
+      else if (country === 'BE') { methods.push('bancontact'); }
+      else if (country === 'AT') { methods.push('eps'); }
+      else if (country === 'PL') { methods.push('p24', 'blik'); }
+      else if (country === 'PT') { methods.push('multibanco'); }
+
       const session = await stripe.checkout.sessions.create({
-        // --- 1. Sab configurations ab Dashboard se control hongi ---
-        // Na ID di hai, na types list. Stripe automatic default pick karega.
+        payment_method_types: methods,
+
+        // --- 2. WALLETS FORCE (Google Pay / Apple Pay) ---
+        // Ye code Stripe ko majboor karta hai ke wo card ke sath wallets bhi dikhaye
+        payment_method_options: {
+          card: {
+            request_three_d_secure: 'any',
+          },
+          // Google Pay aur Apple Pay ke liye extra wallets support
+          klarna: {
+            setup_future_usage: 'none',
+          }
+        },
 
         shipping_address_collection: { 
             allowed_countries: [country] 
