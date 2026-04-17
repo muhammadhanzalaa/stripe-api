@@ -20,12 +20,12 @@ module.exports = async (req, res) => {
         customer_email
       } = req.body;
 
+      // ✅ Jo country frontend se aayegi wahi select hogi (Default DE)
       const country = country_code ? country_code.toUpperCase() : 'DE';
 
-      // ✅ SAFE CURRENCY LOGIC
+      // ✅ SAFE CURRENCY LOGIC (India/INR Removed)
       let userCurrency = 'eur';
       if (country === 'PL') userCurrency = 'pln';
-      else if (country === 'IN') userCurrency = 'inr'; 
       else if (currency) userCurrency = currency.toLowerCase();
 
       // ✅ BASE METHODS
@@ -36,21 +36,20 @@ module.exports = async (req, res) => {
         methods.push('klarna');
       }
 
-      // ✅ COUNTRY SPECIFIC METHODS
+      // ✅ COUNTRY SPECIFIC METHODS (India/UPI Removed)
       if (country === 'NL') methods.push('ideal');
       else if (country === 'BE') methods.push('bancontact');
       else if (country === 'AT') methods.push('eps');
       else if (country === 'PL') methods.push('p24', 'blik');
       else if (country === 'PT') methods.push('multibanco');
-      else if (country === 'IN') methods.push('upi'); 
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
+        
+        // ✅ Billing address required karne se State field trigger hoti hai
         billing_address_collection: 'required',
 
-        // ✅ FIXED STATE OPTION
-        // Stripe automatic state/province field dikhata hai jab billing_address_collection required ho.
-        // India, US, Canada ke liye ye field dropdown ban jayegi.
+        // ✅ Jo country product page se aayi hai, wahi checkout pe lock hogi
         shipping_address_collection: {
           allowed_countries: [country]
         },
@@ -79,7 +78,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ url: session.url });
 
     } catch (err) {
-      // ✅ Agar ab bhi error aaye toh ye exact Stripe error message dikhayega
       return res.status(400).json({ error: err.message });
     }
   }
