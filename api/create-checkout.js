@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
         customer_email
       } = req.body;
 
-      // ✅ Country (default DE)
+      // ✅ Country from IP (frontend se aayegi)
       const country = country_code ? country_code.toUpperCase() : 'DE';
 
       // ✅ Currency logic
@@ -28,15 +28,16 @@ module.exports = async (req, res) => {
       if (country === 'PL') userCurrency = 'pln';
       else if (currency) userCurrency = currency.toLowerCase();
 
-      // ✅ Payment methods
+      // ✅ Base payment methods
       let methods = ['card', 'link'];
 
+      // ✅ Klarna (only supported currencies)
       const klarnaSupportedCurrencies = ['eur', 'usd', 'gbp'];
       if (klarnaSupportedCurrencies.includes(userCurrency)) {
         methods.push('klarna');
       }
 
-      // ✅ Country specific methods
+      // ✅ Country-specific methods
       if (country === 'NL') methods.push('ideal');
       else if (country === 'BE') methods.push('bancontact');
       else if (country === 'AT') methods.push('eps');
@@ -46,17 +47,17 @@ module.exports = async (req, res) => {
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
 
-        // ✅ IMPORTANT: Billing address required
+        // ✅ Address fields improve (state where applicable)
         billing_address_collection: 'required',
 
-        // ✅ SHIPPING: allow multiple countries (better UX)
+        // ✅ Allow multiple countries (UX better)
         shipping_address_collection: {
           allowed_countries: [
             'US','CA','GB','DE','FR','NL','BE','AT','ES','IT','PL','PT'
           ]
         },
 
-        // ✅ Auto detect customer country (helps Stripe show fields properly)
+        // ✅ Helps Stripe detect correct region
         automatic_tax: {
           enabled: true
         },
