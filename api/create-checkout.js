@@ -72,8 +72,8 @@ module.exports = async (req, res) => {
         }],
 
         mode: 'payment',
-        success_url: `https://lonovos.com/pages/thank-you`,
-        cancel_url: `https://lonovos.com/`
+        success_url: `https://www.lonovos.com/pages/thank-you`,
+        cancel_url: `https://www.lonovos.com/`
       });
 
       return res.status(200).json({ url: session.url });
