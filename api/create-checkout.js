@@ -20,24 +20,23 @@ module.exports = async (req, res) => {
         customer_email
       } = req.body;
 
-      // ✅ Country from IP (frontend se aayegi)
+      // ✅ Jo country frontend se aayegi wahi select hogi (Default DE)
       const country = country_code ? country_code.toUpperCase() : 'DE';
 
-      // ✅ Currency logic
+      // ✅ SAFE CURRENCY LOGIC (India/INR Removed)
       let userCurrency = 'eur';
       if (country === 'PL') userCurrency = 'pln';
       else if (currency) userCurrency = currency.toLowerCase();
 
-      // ✅ Base payment methods
+      // ✅ BASE METHODS
       let methods = ['card', 'link'];
 
-      // ✅ Klarna (only supported currencies)
       const klarnaSupportedCurrencies = ['eur', 'usd', 'gbp'];
       if (klarnaSupportedCurrencies.includes(userCurrency)) {
         methods.push('klarna');
       }
 
-      // ✅ Country-specific methods
+      // ✅ COUNTRY SPECIFIC METHODS (India/UPI Removed)
       if (country === 'NL') methods.push('ideal');
       else if (country === 'BE') methods.push('bancontact');
       else if (country === 'AT') methods.push('eps');
@@ -46,45 +45,32 @@ module.exports = async (req, res) => {
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
-
-        // ✅ Address fields improve (state where applicable)
+        
+        // ✅ Billing address required karne se State field trigger hoti hai
         billing_address_collection: 'required',
 
-        // ✅ Allow multiple countries (UX better)
+        // ✅ Jo country product page se aayi hai, wahi checkout pe lock hogi
         shipping_address_collection: {
-          allowed_countries: [
-            'US','CA','GB','DE','FR','NL','BE','AT','ES','IT','PL','PT'
-          ]
-        },
-
-        // ✅ Helps Stripe detect correct region
-        automatic_tax: {
-          enabled: true
+          allowed_countries: [country]
         },
 
         customer_email: customer_email || undefined,
+        phone_number_collection: { enabled: true },
 
-        phone_number_collection: {
-          enabled: true
-        },
-
-        line_items: [
-          {
-            price_data: {
-              currency: userCurrency,
-              product_data: {
-                name: product_name,
-                images: [image_url],
-                description: variant_name
-              },
-              unit_amount: Math.round(parseFloat(price) * 100)
+        line_items: [{
+          price_data: {
+            currency: userCurrency,
+            product_data: {
+              name: product_name,
+              images: [image_url],
+              description: variant_name
             },
-            quantity: 1
-          }
-        ],
+            unit_amount: Math.round(parseFloat(price) * 100)
+          },
+          quantity: 1
+        }],
 
         mode: 'payment',
-
         success_url: `https://www.lonovos.com/pages/thank-you`,
         cancel_url: `https://www.lonovos.com/`
       });
