@@ -1,6 +1,7 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 module.exports = async (req, res) => {
+  // 1. CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -21,11 +22,12 @@ module.exports = async (req, res) => {
         quantity
       } = req.body;
 
+      // 2. Country & Currency Setup
       const country = country_code ? country_code.toUpperCase() : 'DE';
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
       if (country === 'PL' && !currency) userCurrency = 'pln';
 
-      // Payment Methods Logic
+      // 3. Payment Methods Logic (Aapka original logic)
       let methods = ['card', 'link'];
       const klarnaCurrencies = ['eur', 'usd', 'gbp'];
       if (klarnaCurrencies.includes(userCurrency)) methods.push('klarna');
@@ -34,11 +36,15 @@ module.exports = async (req, res) => {
       else if (country === 'BE') methods.push('bancontact');
       else if (country === 'AT') methods.push('eps');
       else if (country === 'PL') methods.push('p24', 'blik');
+      else if (country === 'PT') methods.push('multibanco');
 
+      // 4. Create Stripe Session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
         billing_address_collection: 'required',
-        shipping_address_collection: { allowed_countries: [country] },
+        shipping_address_collection: { 
+          allowed_countries: [country] 
+        },
         customer_email: customer_email || undefined,
         phone_number_collection: { enabled: true },
         line_items: [{
@@ -47,11 +53,16 @@ module.exports = async (req, res) => {
             product_data: {
               name: product_name,
               images: [image_url],
-              description: variant_name // Shows correct colors like Purple/White
+              description: variant_name // Shows correctly selected colors
             },
-            // Using Math.round to avoid decimal issues in Stripe
+            /* IMPORTANT FIX: 
+               Stripe cents mein amount leta hai. 
+               Math.round() decimals ko round-off kar deta hai taake 
+               Stripe API error na de (e.g. 1932.66666 cents invalid hain).
+            */
             unit_amount: Math.round(parseFloat(price) * 100)
           },
+          // Frontend se aayi hui quantity (1 ya 3)
           quantity: parseInt(quantity) || 1 
         }],
         mode: 'payment',
@@ -60,7 +71,9 @@ module.exports = async (req, res) => {
       });
 
       return res.status(200).json({ url: session.url });
+
     } catch (err) {
+      console.error("Stripe Error:", err.message);
       return res.status(400).json({ error: err.message });
     }
   }
