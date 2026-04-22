@@ -1,6 +1,7 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 module.exports = async (req, res) => {
+  // CORS Setup
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -10,12 +11,23 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      const { product_name, variant_name, image_url, price, currency, country_code, customer_email, quantity } = req.body;
+      const { 
+        product_name, 
+        variant_name, 
+        image_url, 
+        price, 
+        currency, 
+        country_code, 
+        customer_email, 
+        quantity 
+      } = req.body;
 
+      // 1. Currency aur Country setup
       const country = country_code ? country_code.toUpperCase() : 'DE';
       let userCurrency = currency ? currency.toLowerCase() : 'eur';
       if (country === 'PL' && !currency) userCurrency = 'pln';
 
+      // 2. Payment Methods Logic
       let methods = ['card', 'link'];
       const klarnaCurrencies = ['eur', 'usd', 'gbp'];
       if (klarnaCurrencies.includes(userCurrency)) methods.push('klarna');
@@ -26,6 +38,7 @@ module.exports = async (req, res) => {
       else if (country === 'PL') methods.push('p24', 'blik');
       else if (country === 'PT') methods.push('multibanco');
 
+      // 3. Create Stripe Session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
         billing_address_collection: 'required',
@@ -35,11 +48,16 @@ module.exports = async (req, res) => {
         line_items: [{
           price_data: {
             currency: userCurrency,
-            product_data: { name: product_name, images: [image_url], description: variant_name },
+            product_data: { 
+              name: product_name, 
+              images: [image_url], 
+              description: variant_name // Selected colors yahan dikhenge
+            },
+            // Math.round cents ke liye lazmi hai taake decimal error na aaye
             unit_amount: Math.round(parseFloat(price) * 100) 
           },
-          // ✅ FIX: Sakhti se quantity ko number mein convert karein
-          quantity: Number(quantity) || 1 
+          // Frontend se aayi hui sahi quantity (Buy 1 ke liye 1, Bundle ke liye 3)
+          quantity: parseInt(quantity) || 1 
         }],
         mode: 'payment',
         success_url: `https://www.lonovos.com/pages/thank-you`,
@@ -48,6 +66,7 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ url: session.url });
     } catch (err) {
+      console.error("Stripe Error:", err.message);
       return res.status(400).json({ error: err.message });
     }
   }
