@@ -17,26 +17,23 @@ module.exports = async (req, res) => {
         price,
         currency,
         country_code,
-        customer_email
+        customer_email,
+        quantity // ✅ Frontend se dynamic quantity receive ho rahi hai
       } = req.body;
 
-      // ✅ Jo country frontend se aayegi wahi select hogi (Default DE)
       const country = country_code ? country_code.toUpperCase() : 'DE';
 
-      // ✅ SAFE CURRENCY LOGIC (India/INR Removed)
       let userCurrency = 'eur';
       if (country === 'PL') userCurrency = 'pln';
       else if (currency) userCurrency = currency.toLowerCase();
 
-      // ✅ BASE METHODS
+      // --- AAPKA ORIGINAL METHODS LOGIC ---
       let methods = ['card', 'link'];
-
       const klarnaSupportedCurrencies = ['eur', 'usd', 'gbp'];
       if (klarnaSupportedCurrencies.includes(userCurrency)) {
         methods.push('klarna');
       }
 
-      // ✅ COUNTRY SPECIFIC METHODS (India/UPI Removed)
       if (country === 'NL') methods.push('ideal');
       else if (country === 'BE') methods.push('bancontact');
       else if (country === 'AT') methods.push('eps');
@@ -45,11 +42,7 @@ module.exports = async (req, res) => {
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
-        
-        // ✅ Billing address required karne se State field trigger hoti hai
         billing_address_collection: 'required',
-
-        // ✅ Jo country product page se aayi hai, wahi checkout pe lock hogi
         shipping_address_collection: {
           allowed_countries: [country]
         },
@@ -63,11 +56,12 @@ module.exports = async (req, res) => {
             product_data: {
               name: product_name,
               images: [image_url],
-              description: variant_name
+              description: variant_name // ✅ Ab yahan sahi variants (Green/White/Grey) aayenge
             },
             unit_amount: Math.round(parseFloat(price) * 100)
           },
-          quantity: 1
+          // ✅ PRICE DOUBLE FIX: Stripe ab Price * Quantity khud calculate karega
+          quantity: parseInt(quantity) || 1 
         }],
 
         mode: 'payment',
