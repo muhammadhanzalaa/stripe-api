@@ -1,10 +1,13 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   if (req.method === 'OPTIONS') return res.status(200).end();
+
   if (req.method === 'POST') {
     try {
       const {
@@ -18,12 +21,18 @@ module.exports = async (req, res) => {
         line_items_data
       } = req.body;
 
+      // ✅ STEP 1: Country handle karein
       const country = country_code ? country_code.toUpperCase() : 'DE';
 
-      let userCurrency = 'eur';
-      if (country === 'PL') userCurrency = 'pln';
-      else if (currency) userCurrency = currency.toLowerCase();
+      // ✅ STEP 2: Currency Fix - Pehle Shopify ki bheji hui currency ko check karein
+      let userCurrency = 'eur'; // Default
+      if (currency) {
+        userCurrency = currency.toLowerCase();
+      } else if (country === 'PL') {
+        userCurrency = 'pln';
+      }
 
+      // ✅ STEP 3: Payment Methods setup
       let methods = ['card', 'link'];
       const klarnaSupportedCurrencies = ['eur', 'usd', 'gbp'];
       if (klarnaSupportedCurrencies.includes(userCurrency)) {
@@ -36,19 +45,19 @@ module.exports = async (req, res) => {
       else if (country === 'PL') methods.push('p24', 'blik');
       else if (country === 'PT') methods.push('multibanco');
 
-      // ✅ Line items build karo
+      // ✅ STEP 4: Line Items Build Karo (Title + Variant Mix)
       let lineItems = [];
 
       if (line_items_data && line_items_data.length > 0) {
-        // Buy 2 Get 1 Free — multiple line items
+        // Multi-Item / Bundle Logic
         line_items_data.forEach(item => {
           lineItems.push({
             price_data: {
               currency: userCurrency,
               product_data: {
-                name: product_name,
-                images: [image_url],
-                description: item.variant
+                // Yahan Name + Variant ko mix kar diya taake email/receipt theek ho jaye
+                name: `${product_name} - ${item.variant}`,
+                images: [image_url]
               },
               unit_amount: Math.round(parseFloat(item.price) * 100)
             },
@@ -56,14 +65,14 @@ module.exports = async (req, res) => {
           });
         });
       } else {
-        // Buy 1 — single line item
+        // Single Item Logic
         lineItems.push({
           price_data: {
             currency: userCurrency,
             product_data: {
-              name: product_name,
-              images: [image_url],
-              description: variant_name
+              // Yahan bhi Title + Variant mix kiya
+              name: `${product_name} - ${variant_name}`,
+              images: [image_url]
             },
             unit_amount: Math.round(parseFloat(price) * 100)
           },
@@ -71,6 +80,7 @@ module.exports = async (req, res) => {
         });
       }
 
+      // ✅ STEP 5: Create Stripe Session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: methods,
         billing_address_collection: 'required',
@@ -81,12 +91,17 @@ module.exports = async (req, res) => {
         phone_number_collection: { enabled: true },
         line_items: lineItems,
         mode: 'payment',
+        // In parameters ki wajah se email aur metadata theek rehta hai
+        payment_intent_data: {
+          description: `Order for ${product_name} (${variant_name})`,
+        },
         success_url: `https://www.lonovos.com/pages/thank-you`,
         cancel_url: `https://www.lonovos.com/`
       });
 
       return res.status(200).json({ url: session.url });
     } catch (err) {
+      console.error("Stripe Error:", err.message);
       return res.status(400).json({ error: err.message });
     }
   }
