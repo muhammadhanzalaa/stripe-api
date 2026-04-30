@@ -11,7 +11,6 @@ module.exports.config = {
 
 // 2. Main Handler Function
 module.exports = async (req, res) => {
-  // Method Check
   if (req.method !== 'POST') {
     return res.status(405).send('Method Not Allowed');
   }
@@ -31,7 +30,6 @@ module.exports = async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // 3. Payment Successful Logic
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
 
@@ -41,27 +39,34 @@ module.exports = async (req, res) => {
       const firstName = nameParts[0] || "Customer";
       const lastName = nameParts.slice(1).join(' ') || "";
 
-      // ✅ FIX 1: Currency session se lo, USD hardcoded nahi
       const orderCurrency = session.currency ? session.currency.toUpperCase() : "EUR";
-
-      // ✅ FIX 2: Product name + variant title theek kiya
       const productName = session.metadata?.product_name || "Product";
-      const variantName = session.metadata?.variant_name || "";
-      const lineItemTitle = variantName ? `${productName} - ${variantName}` : productName;
+
+      // ✅ Stripe se sare line items fetch karo
+      const stripeLineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 10 });
+
+      // ✅ Har Stripe line item ko alag Shopify line item banao
+      const shopifyLineItems = stripeLineItems.data.map(item => ({
+        title: item.description || productName,
+        price: (item.amount_total / 100).toFixed(2),
+        quantity: item.quantity || 1
+      }));
+
+      // ✅ Note mein bhi sare variants clearly likho owner ke liye
+      const variantsSummary = stripeLineItems.data
+        .map(item => `${item.description} x${item.quantity}`)
+        .join(' | ');
 
       const orderData = {
         order: {
           email: session.customer_details?.email,
           send_receipt: true,
           financial_status: "paid",
-          currency: orderCurrency, // ✅ FIX 3: Order level pe currency
-          
-          line_items: [{
-            title: lineItemTitle, // ✅ "Product" nahi, actual name
-            price: (session.amount_total / 100).toFixed(2),
-            currency: orderCurrency, // ✅ line item pe bhi currency
-            quantity: 1
-          }],
+          currency: orderCurrency,
+
+          // ✅ Alag alag line items — Shopify order page pe sab dikhe ga
+          line_items: shopifyLineItems,
+
           customer: {
             email: session.customer_details?.email,
             first_name: firstName,
@@ -86,7 +91,9 @@ module.exports = async (req, res) => {
             first_name: firstName,
             last_name: lastName
           },
-          note: `Order from Stripe. Variants: ${session.metadata?.variants || "Standard"}`,
+
+          // ✅ Owner ke liye note mein sare variants clearly
+          note: `Order from Stripe. Items: ${variantsSummary}`,
           inventory_behaviour: "decrement_ignoring_policy"
         }
       };
