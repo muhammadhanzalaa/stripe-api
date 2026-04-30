@@ -21,7 +21,6 @@ module.exports = async (req, res) => {
 
   try {
     const rawBody = await getRawBody(req);
-    // Signature verification
     event = stripe.webhooks.constructEvent(
       rawBody,
       sig,
@@ -29,7 +28,6 @@ module.exports = async (req, res) => {
     );
   } catch (err) {
     console.error("❌ Webhook Signature Error:", err.message);
-    // Yahan 400 bhej rahe hain taake Stripe ko pata chale signature galat hai
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
@@ -38,23 +36,30 @@ module.exports = async (req, res) => {
     const session = event.data.object;
 
     try {
-      // Name splitting safely
       const fullName = session.shipping_details?.name || session.customer_details?.name || "Customer";
       const nameParts = fullName.trim().split(/\s+/);
       const firstName = nameParts[0] || "Customer";
       const lastName = nameParts.slice(1).join(' ') || "";
 
-      // Shopify Order Payload
+      // ✅ FIX 1: Currency session se lo, USD hardcoded nahi
+      const orderCurrency = session.currency ? session.currency.toUpperCase() : "EUR";
+
+      // ✅ FIX 2: Product name + variant title theek kiya
+      const productName = session.metadata?.product_name || "Product";
+      const variantName = session.metadata?.variant_name || "";
+      const lineItemTitle = variantName ? `${productName} - ${variantName}` : productName;
+
       const orderData = {
         order: {
-          // Email triggers ke liye ye fields lazmi hain
           email: session.customer_details?.email,
-          send_receipt: true, // <--- Is se customer ko email jayegi
+          send_receipt: true,
           financial_status: "paid",
+          currency: orderCurrency, // ✅ FIX 3: Order level pe currency
           
           line_items: [{
-            title: session.metadata?.product_name || "Product",
+            title: lineItemTitle, // ✅ "Product" nahi, actual name
             price: (session.amount_total / 100).toFixed(2),
+            currency: orderCurrency, // ✅ line item pe bhi currency
             quantity: 1
           }],
           customer: {
@@ -86,7 +91,6 @@ module.exports = async (req, res) => {
         }
       };
 
-      // Shopify API Call
       const rawShopifyUrl = process.env.SHOPIFY_STORE_URL || "";
       const shopifyUrl = rawShopifyUrl.replace('https://', '').replace(/\/$/, '');
       const token = process.env.SHOPIFY_CLIENT_SECRET;
@@ -105,16 +109,13 @@ module.exports = async (req, res) => {
           }
         }
       );
-      
+
       console.log("✅ Shopify Order Created & Email Sent!");
 
     } catch (err) {
-      // Yahan console log karein taake Vercel logs mein error dikhe
       console.error("❌ Shopify API Error:", err.response ? JSON.stringify(err.response.data) : err.message);
-      // Note: Hum yahan status 200 hi bhejenge taake Stripe baar baar retry karke error na de
     }
   }
 
-  // Stripe ko hamesha 200 OK bhejna chahiye
   res.status(200).json({ received: true });
 };
