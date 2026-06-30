@@ -1,6 +1,13 @@
 const axios = require('axios');
+const crypto = require('crypto');
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 const getRawBody = require('raw-body');
+
+// Meta CAPI ke liye hashing function
+function hashData(data) {
+  if (!data) return null;
+  return crypto.createHash('sha256').update(data.trim().toLowerCase()).digest('hex');
+}
 
 // 1. Vercel Config
 module.exports.config = {
@@ -63,10 +70,7 @@ module.exports = async (req, res) => {
           send_receipt: true,
           financial_status: "paid",
           currency: orderCurrency,
-
-          // ✅ Alag alag line items — Shopify order page pe sab dikhe ga
           line_items: shopifyLineItems,
-
           customer: {
             email: session.customer_details?.email,
             first_name: firstName,
@@ -91,8 +95,6 @@ module.exports = async (req, res) => {
             first_name: firstName,
             last_name: lastName
           },
-
-          // ✅ Owner ke liye note mein sare variants clearly
           note: `Order from Stripe. Items: ${variantsSummary}`,
           inventory_behaviour: "decrement_ignoring_policy"
         }
@@ -106,6 +108,7 @@ module.exports = async (req, res) => {
         throw new Error("Missing Shopify Configuration in Environment Variables");
       }
 
+      // Shopify Order Create Request
       await axios.post(
         `https://${shopifyUrl}/admin/api/2024-01/orders.json`,
         orderData,
@@ -119,8 +122,68 @@ module.exports = async (req, res) => {
 
       console.log("✅ Shopify Order Created & Email Sent!");
 
+      // ==========================================
+      // 🔥 META CONVERSIONS API (CAPI) INTEGRATION
+      // ==========================================
+      const metaPixelId = process.env.META_PIXEL_ID;
+      const metaAccessToken = process.env.META_ACCESS_TOKEN;
+
+      if (metaPixelId && metaAccessToken) {
+        const emailHashed = hashData(session.customer_details?.email);
+        const firstNameHashed = hashData(firstName);
+        const lastNameHashed = hashData(lastName);
+        const phoneHashed = hashData(session.customer_details?.phone);
+        const countryHashed = hashData(session.shipping_details?.address?.country || session.customer_details?.address?.country);
+
+        // Client IP aur User Agent agar Stripe metadata se milay, warna fallback req headers
+        const clientIp = session.metadata?.client_ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const clientUserAgent = session.metadata?.client_user_agent || req.headers['user-agent'];
+
+        const metaPayload = {
+          data: [
+            {
+              event_name: "Purchase",
+              event_time: Math.floor(Date.now() / 1000),
+              event_id: session.id, // Deduplication ke liye Stripe Session ID best hai
+              event_source_url: `https://${shopifyUrl}`,
+              action_source: "website",
+              user_data: {
+                em: emailHashed ? [emailHashed] : [],
+                fn: firstNameHashed ? [firstNameHashed] : [],
+                ln: lastNameHashed ? [lastNameHashed] : [],
+                ph: phoneHashed ? [phoneHashed] : [],
+                country: countryHashed ? [countryHashed] : [],
+                client_ip_address: clientIp,
+                client_user_agent: clientUserAgent
+              },
+              custom_data: {
+                currency: orderCurrency.toLowerCase(),
+                value: session.amount_total / 100,
+                content_type: "product",
+                contents: stripeLineItems.data.map(item => ({
+                  id: item.price?.product || "product_id",
+                  quantity: item.quantity || 1,
+                  item_price: item.amount_total / 100
+                }))
+              }
+            }
+          ]
+        };
+
+        // Meta API request push karein
+        await axios.post(
+          `https://graph.facebook.com/v19.0/${metaPixelId}/events?access_token=${metaAccessToken}`,
+          metaPayload,
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+
+        console.log("🔥 Meta CAPI Purchase Event Sent Successfully!");
+      } else {
+        console.log("⚠️ Meta Pixel ID or Access Token missing in Env. Skipping CAPI.");
+      }
+
     } catch (err) {
-      console.error("❌ Shopify API Error:", err.response ? JSON.stringify(err.response.data) : err.message);
+      console.error("❌ Process Error:", err.response ? JSON.stringify(err.response.data) : err.message);
     }
   }
 
