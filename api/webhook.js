@@ -40,39 +40,53 @@ module.exports = async (req, res) => {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
 
+    // Name Parsing Logic with Safe Fallback for Single Names
+    const fullName = session.shipping_details?.name || session.customer_details?.name || "Customer";
+    const nameParts = fullName.trim().split(/\s+/);
+    const firstName = nameParts[0] || "Customer";
+    
+    // 🔥 FIX: Agar last_name blank ho toh '.' bhejain taake Validation Error na aaye
+    const lastName = nameParts.slice(1).join(' ') || ".";
+
+    const orderCurrency = session.currency ? session.currency.toUpperCase() : "EUR";
+    const productName = session.metadata?.product_name || "Product";
+    const customerEmail = session.customer_details?.email;
+
+    let stripeLineItems;
     try {
-      const fullName = session.shipping_details?.name || session.customer_details?.name || "Customer";
-      const nameParts = fullName.trim().split(/\s+/);
-      const firstName = nameParts[0] || "Customer";
-      const lastName = nameParts.slice(1).join(' ') || "";
-
-      const orderCurrency = session.currency ? session.currency.toUpperCase() : "EUR";
-      const productName = session.metadata?.product_name || "Product";
-
       // ✅ Stripe se sare line items fetch karo
-      const stripeLineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 10 });
+      stripeLineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 10 });
+    } catch (stripeErr) {
+      console.error("❌ Stripe Line Items Fetch Error:", stripeErr.message);
+      stripeLineItems = { data: [] };
+    }
 
-      // ✅ Har Stripe line item ko alag Shopify line item banao
-      const shopifyLineItems = stripeLineItems.data.map(item => ({
-        title: item.description || productName,
-        price: (item.amount_total / 100).toFixed(2),
-        quantity: item.quantity || 1
-      }));
+    // ✅ Har Stripe line item ko alag Shopify line item banao
+    const shopifyLineItems = stripeLineItems.data.length > 0 
+      ? stripeLineItems.data.map(item => ({
+          title: item.description || productName,
+          price: (item.amount_total / 100).toFixed(2),
+          quantity: item.quantity || 1
+        }))
+      : [{ title: productName, price: (session.amount_total / 100).toFixed(2), quantity: 1 }];
 
-      // ✅ Note mein bhi sare variants clearly likho owner ke liye
-      const variantsSummary = stripeLineItems.data
-        .map(item => `${item.description} x${item.quantity}`)
-        .join(' | ');
+    // ✅ Note mein bhi sare variants clearly likho owner ke liye
+    const variantsSummary = stripeLineItems.data.length > 0
+      ? stripeLineItems.data.map(item => `${item.description} x${item.quantity}`).join(' | ')
+      : productName;
 
+    // STEP A: SHOPIFY ORDER CREATION FLOW
+    try {
       const orderData = {
         order: {
-          email: session.customer_details?.email,
-          send_receipt: true,
+          email: customerEmail,
+          send_receipt: true, // Automatically triggers the customer confirmation email
+          send_fulfillment_receipt: true,
           financial_status: "paid",
           currency: orderCurrency,
           line_items: shopifyLineItems,
           customer: {
-            email: session.customer_details?.email,
+            email: customerEmail,
             first_name: firstName,
             last_name: lastName
           },
@@ -108,7 +122,7 @@ module.exports = async (req, res) => {
         throw new Error("Missing Shopify Configuration in Environment Variables");
       }
 
-      // Shopify Order Create Request
+      // Shopify Admin API request payload trigger
       await axios.post(
         `https://${shopifyUrl}/admin/api/2024-01/orders.json`,
         orderData,
@@ -120,22 +134,24 @@ module.exports = async (req, res) => {
         }
       );
 
-      console.log("✅ Shopify Order Created & Email Sent!");
+      console.log("✅ Shopify Order Created successfully & Confirmation Email triggered!");
 
-      // ==========================================
-      // 🔥 META CONVERSIONS API (CAPI) INTEGRATION
-      // ==========================================
+    } catch (shopifyError) {
+      console.error("❌ Shopify Order Creation Failed Error Log:", shopifyError.response ? JSON.stringify(shopifyError.response.data) : shopifyError.message);
+    }
+
+    // STEP B: META CONVERSIONS API (CAPI) FLOW
+    try {
       const metaPixelId = process.env.META_PIXEL_ID;
       const metaAccessToken = process.env.META_ACCESS_TOKEN;
 
       if (metaPixelId && metaAccessToken) {
-        const emailHashed = hashData(session.customer_details?.email);
+        const emailHashed = hashData(customerEmail);
         const firstNameHashed = hashData(firstName);
         const lastNameHashed = hashData(lastName);
         const phoneHashed = hashData(session.customer_details?.phone);
         const countryHashed = hashData(session.shipping_details?.address?.country || session.customer_details?.address?.country);
 
-        // Client IP aur User Agent agar Stripe metadata se milay, warna fallback req headers
         const clientIp = session.metadata?.client_ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
         const clientUserAgent = session.metadata?.client_user_agent || req.headers['user-agent'];
 
@@ -144,8 +160,8 @@ module.exports = async (req, res) => {
             {
               event_name: "Purchase",
               event_time: Math.floor(Date.now() / 1000),
-              event_id: session.id, // Deduplication ke liye Stripe Session ID best hai
-              event_source_url: `https://${shopifyUrl}`,
+              event_id: session.id,
+              event_source_url: `https://${process.env.SHOPIFY_STORE_URL || ''}`,
               action_source: "website",
               user_data: {
                 em: emailHashed ? [emailHashed] : [],
@@ -170,7 +186,6 @@ module.exports = async (req, res) => {
           ]
         };
 
-        // Meta API request push karein
         await axios.post(
           `https://graph.facebook.com/v19.0/${metaPixelId}/events?access_token=${metaAccessToken}`,
           metaPayload,
@@ -181,9 +196,8 @@ module.exports = async (req, res) => {
       } else {
         console.log("⚠️ Meta Pixel ID or Access Token missing in Env. Skipping CAPI.");
       }
-
-    } catch (err) {
-      console.error("❌ Process Error:", err.response ? JSON.stringify(err.response.data) : err.message);
+    } catch (metaError) {
+      console.error("❌ Meta CAPI Process Error Log:", metaError.response ? JSON.stringify(metaError.response.data) : metaError.message);
     }
   }
 
