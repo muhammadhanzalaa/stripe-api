@@ -122,9 +122,9 @@ module.exports = async (req, res) => {
         throw new Error("Missing Shopify Configuration in Environment Variables");
       }
 
-      // Shopify Admin API request payload trigger
+      // ✅ FIX 1: API Version ko update kar diya taake future me sync block na ho
       await axios.post(
-        `https://${shopifyUrl}/admin/api/2024-01/orders.json`,
+        `https://${shopifyUrl}/admin/api/2024-10/orders.json`,
         orderData,
         {
           headers: {
@@ -155,11 +155,16 @@ module.exports = async (req, res) => {
         const clientIp = session.metadata?.client_ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
         const clientUserAgent = session.metadata?.client_user_agent || req.headers['user-agent'];
 
+        // Line Items se Product IDs nikalne ka safe extracted array
+        const productIdsArray = stripeLineItems.data.length > 0
+          ? stripeLineItems.data.map(item => item.price?.product || "product_id")
+          : ["product_id"];
+
         const metaPayload = {
           data: [
             {
               event_name: "Purchase",
-              event_time: Math.floor(Date.now() / 1000),
+              event_time: session.created || Math.floor(Date.now() / 1000), // Original transaction time for better matching
               event_id: session.id,
               event_source_url: `https://${process.env.SHOPIFY_STORE_URL || ''}`,
               action_source: "website",
@@ -176,14 +181,18 @@ module.exports = async (req, res) => {
                 currency: orderCurrency.toLowerCase(),
                 value: session.amount_total / 100,
                 content_type: "product",
-                contents: stripeLineItems.data.map(item => ({
-                  id: item.price?.product || "product_id",
-                  quantity: item.quantity || 1,
-                  item_price: item.amount_total / 100
-                }))
+                // ✅ FIX 2: Top-level content_ids array pass kiya taake Facebook standard validation pass ho sake
+                content_ids: productIdsArray,
+                contents: stripeLineItems.data.length > 0
+                  ? stripeLineItems.data.map(item => ({
+                      id: item.price?.product || "product_id",
+                      quantity: item.quantity || 1,
+                      item_price: item.amount_total / 100
+                    }))
+                  : [{ id: "product_id", quantity: 1, item_price: session.amount_total / 100 }]
               }
             }
-          ]
+          }
         };
 
         await axios.post(
