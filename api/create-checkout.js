@@ -21,7 +21,11 @@ module.exports = async (req, res) => {
       currency,
       country_code,
       customer_email,
-      line_items_data
+      line_items_data,
+      // ✅ FIX: ab in teeno ko destructure kar rahe hain taake metadata mein save ho sakein
+      fbp,
+      fbc,
+      event_id
     } = req.body;
 
     // ✅ STEP 1: Customer ki apni original country aur currency lo (No Overrides)
@@ -97,7 +101,12 @@ module.exports = async (req, res) => {
       metadata: {
         product_name: product_name || '',
         variant_name: variant_name || '',
-        variants: variant_name || 'Standard'
+        variants: variant_name || 'Standard',
+        // ✅ FIX: fbp/fbc/event_id ab metadata mein save ho rahe hain taake webhook.js
+        // Meta CAPI call mein inhe use kar sake — match quality aur dedupe dono ke liye
+        fbp: fbp || '',
+        fbc: fbc || '',
+        client_event_id: event_id || ''
       },
       success_url: `https://www.lonovos.com/pages/thank-you`,
       cancel_url: `https://www.lonovos.com/`
@@ -105,7 +114,7 @@ module.exports = async (req, res) => {
 
     // ✅ STEP 6: Smart Dynamic Shipping Filter (Bypasses 504 Timeout)
     const stripeSupportedShipping = ['US', 'CA', 'GB', 'AU', 'NZ', 'DE', 'FR', 'NL', 'AT', 'BE', 'PL', 'PT', 'IT', 'ES', 'IE'];
-    
+
     if (stripeSupportedShipping.includes(country)) {
       sessionConfig.shipping_address_collection = {
         allowed_countries: [country]
