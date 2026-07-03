@@ -1,7 +1,10 @@
 const axios = require('axios');
 const crypto = require('crypto');
-const stripe = require('stripe')(process.env.STRIPE_SECRET || process.env.STRIPE_SECRET_KEY);
-const getRawBody = require('raw-body');
+const getRawBody = require('raw-body'); // 🔥 FIX: Isko sabse upar move kar diya hai
+
+// Vercel ke variables ke mutabiq strict binding
+const stripeSecret = process.env.STRIPE_SECRET || process.env.STRIPE_SECRET_KEY;
+const stripe = require('stripe')(stripeSecret);
  
 // Meta CAPI ke liye hashing function
 function hashData(data) {
@@ -27,14 +30,18 @@ module.exports = async (req, res) => {
  
   try {
     const rawBody = await getRawBody(req);
+    // Webhook secret variable fallback ke sath lock kiya hai
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET_LIVE;
+    
     event = stripe.webhooks.constructEvent(
       rawBody,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET
+      webhookSecret
     );
   } catch (err) {
     console.error("❌ Webhook Signature Error:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    // Isko 200 de rahe hain taake Stripe baar baar fail na kare, par log error karega
+    return res.status(200).send(`Webhook Error Handled: ${err.message}`);
   }
  
   if (event.type === 'checkout.session.completed') {
@@ -43,14 +50,14 @@ module.exports = async (req, res) => {
  
     // Metadata safely extract karein (Deduplication Sync ke liye)
     const metadata = session.metadata || {};
-    const finalEventId = metadata.event_id || session.id; // 🔥 Frontend event_id ya fallback session.id
-    const catalogProductHandle = metadata.product_handle || "non-slip-stair-tread-mats"; // 🔥 Matching Catalog ID
+    const finalEventId = metadata.event_id || session.id; 
+    const catalogProductHandle = metadata.product_handle || "non-slip-stair-tread-mats"; 
 
-    // Name Parsing Logic with Safe Fallback for Single Names
+    // Name Parsing Logic
     const fullName = session.shipping_details?.name || session.customer_details?.name || "Customer";
     const nameParts = fullName.trim().split(/\s+/);
     const firstName = nameParts[0] || "Customer";
-    const lastName = nameParts.slice(1).join(' ') || '.'; // Validation fail fallback
+    const lastName = nameParts.slice(1).join(' ') || '.'; 
  
     const orderCurrency = session.currency ? session.currency.toUpperCase() : "EUR";
     const productName = metadata.product_name || "Product";
@@ -64,7 +71,7 @@ module.exports = async (req, res) => {
       stripeLineItems = { data: [] };
     }
  
-    // ✅ Har Stripe line item ko alag Shopify line item banao
+    // Har Stripe line item ko alag Shopify line item banao
     const shopifyLineItems = stripeLineItems.data.length > 0
       ? stripeLineItems.data.map(item => ({
           title: item.description || productName,
@@ -75,7 +82,6 @@ module.exports = async (req, res) => {
         }))
       : [{ title: productName, price: (session.amount_total / 100).toFixed(2), quantity: 1, requires_shipping: true, fulfillment_service: 'manual' }];
  
-    // ✅ Note mein bhi sare variants clearly likho owner ke liye
     const variantsSummary = stripeLineItems.data.length > 0
       ? stripeLineItems.data.map(item => `${item.description} x${item.quantity}`).join(' | ')
       : productName;
@@ -159,7 +165,7 @@ module.exports = async (req, res) => {
             {
               event_name: "Purchase",
               event_time: session.created || Math.floor(Date.now() / 1000), 
-              event_id: finalEventId, // 🔥 Frontend Pixel se matched unique event_id
+              event_id: finalEventId, 
               event_source_url: metadata.event_source_url || `https://www.lonovos.com/products/non-slip-stair-tread-mats`,
               action_source: "website",
               user_data: {
@@ -177,7 +183,6 @@ module.exports = async (req, res) => {
                 currency: orderCurrency.toLowerCase(),
                 value: session.amount_total / 100,
                 content_type: "product",
-                // ✅ Standard Catalog Match: Catalog item drop handle auto fixed
                 content_ids: [catalogProductHandle],
                 contents: [
                   {
@@ -188,7 +193,8 @@ module.exports = async (req, res) => {
                 ]
               }
             }
-          ]
+          ],
+          test_event_code: "TEST84180" 
         };
  
         console.log(`Sending CAPI Data Payload with matching event_id: ${finalEventId}`);
@@ -207,6 +213,5 @@ module.exports = async (req, res) => {
     }
   }
  
-  // Network Lock Error Avoid karne ke liye hamesha response code 200 return karega
   res.status(200).json({ received: true });
 };
