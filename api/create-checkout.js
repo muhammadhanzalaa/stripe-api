@@ -1,6 +1,16 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 export default async (req, res) => {
+  // 🔥 1. CORS Headers Apply Karen (Cross-Origin Block Fix)
+  res.setHeader('Access-Control-Allow-Origin', '*'); 
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // 🔥 2. Preflight Browser Request (OPTIONS) Handle Karen
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -44,13 +54,19 @@ export default async (req, res) => {
 
     // Dynamic payment methods mapping
     const methods = ['card'];
-    if (['EUR', 'DKK', 'SEK', 'GBP'].includes(userCurrency.toUpperCase())) {
-      methods.push('ideal', 'bancontact', 'klarna');
+    const upperCurrency = userCurrency.toUpperCase();
+    
+    // Klarna multi-currency support karta hai, par ideal/bancontact sirf EUR par chalte hain
+    if (['EUR', 'DKK', 'SEK', 'GBP'].includes(upperCurrency)) {
+      methods.push('klarna');
+    }
+    if (upperCurrency === 'EUR') {
+      methods.push('ideal', 'bancontact');
     }
 
-    // ✅ STEP 5: Create Stripe Session Config (Fixed with Tracking Payload)
+    // ✅ Create Stripe Session Config (With Tracking Payload)
     const sessionConfig = {
-      payment_method_types: methods.filter(m => m === 'card' || m === 'klarna' || m === 'ideal' || m === 'bancontact'),
+      payment_method_types: methods,
       billing_address_collection: 'required',
       phone_number_collection: { enabled: true },
       line_items: lineItems,
@@ -62,7 +78,6 @@ export default async (req, res) => {
         product_name: product_name || '',
         variant_name: variant_name || '',
         variants: variant_name || 'Standard',
-        // 🔥 Meta Pixel aur CAPI sync ke liye unique tracking fields:
         event_id: event_id || '', 
         fbp: fbp || '',
         fbc: fbc || '',
@@ -73,7 +88,7 @@ export default async (req, res) => {
       cancel_url: `https://www.lonovos.com/`
     };
 
-    // ✅ STEP 6: Smart Dynamic Shipping Filter
+    // ✅ Smart Dynamic Shipping Filter
     const stripeSupportedShipping = ['US', 'CA', 'GB', 'AU', 'NZ', 'DE', 'FR', 'NL', 'AT', 'BE', 'PL', 'PT', 'IT', 'ES', 'IE', 'DK', 'SE'];
     
     if (stripeSupportedShipping.includes(country)) {
