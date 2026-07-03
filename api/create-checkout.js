@@ -22,22 +22,20 @@ module.exports = async (req, res) => {
       country_code,
       customer_email,
       line_items_data,
-      // ✅ FIX: ab in teeno ko destructure kar rahe hain taake metadata mein save ho sakein
-      fbp,
-      fbc,
-      event_id
+      product_handle,   // NEW: for consistent content_ids across funnel
+      fbp,               // NEW
+      fbc,               // NEW
+      event_id,          // NEW: client-generated InitiateCheckout event_id
+      event_source_url   // NEW
     } = req.body;
 
-    // ✅ STEP 1: Customer ki apni original country aur currency lo (No Overrides)
     let country = country_code ? country_code.toUpperCase().trim() : 'DE';
     let userCurrency = currency ? currency.toLowerCase().trim() : 'eur';
 
-    // Shopify multi-currency standard handler for fallback cases
     if (!currency && country === 'PL') {
       userCurrency = 'pln';
     }
 
-    // ✅ STEP 2: Payment Methods Setup
     let methods = ['card', 'link'];
     const klarnaSupportedCurrencies = ['eur', 'usd', 'gbp'];
     if (klarnaSupportedCurrencies.includes(userCurrency)) {
@@ -49,11 +47,9 @@ module.exports = async (req, res) => {
     else if (country === 'PL') methods.push('p24', 'blik');
     else if (country === 'PT') methods.push('multibanco');
 
-    // ✅ STEP 3: Verified Shopify CDN Fallback Image URL
     const fallbackImage = "https://cdn.shopify.com/s/files/1/0979/0472/2240/files/ee7017476aac4b72b801389ed16d8dd1.webp";
     const validImage = image_url && image_url.trim().startsWith('http') ? image_url.trim() : fallbackImage;
 
-    // ✅ STEP 4: Build Line Items Array safely
     let lineItems = [];
     if (line_items_data && line_items_data.length > 0) {
       line_items_data.forEach(item => {
@@ -83,12 +79,15 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Zero-value validation check
     if (lineItems.length === 0 || lineItems[0].price_data.unit_amount <= 0) {
       return res.status(400).json({ error: 'Invalid checkout parameters or zero amount value.' });
     }
 
-    // ✅ STEP 5: Create Stripe Session Config
+    // Capture real customer IP/UA at the point closest to the actual click
+    const clientIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+      || req.socket?.remoteAddress || '';
+    const clientUserAgent = req.headers['user-agent'] || '';
+
     const sessionConfig = {
       payment_method_types: methods,
       billing_address_collection: 'required',
@@ -102,17 +101,18 @@ module.exports = async (req, res) => {
         product_name: product_name || '',
         variant_name: variant_name || '',
         variants: variant_name || 'Standard',
-        // ✅ FIX: fbp/fbc/event_id ab metadata mein save ho rahe hain taake webhook.js
-        // Meta CAPI call mein inhe use kar sake — match quality aur dedupe dono ke liye
+        product_handle: product_handle || '',
         fbp: fbp || '',
         fbc: fbc || '',
-        client_event_id: event_id || ''
+        client_event_id: event_id || '',
+        event_source_url: event_source_url || '',
+        client_ip: clientIp,
+        client_user_agent: clientUserAgent
       },
       success_url: `https://www.lonovos.com/pages/thank-you`,
       cancel_url: `https://www.lonovos.com/`
     };
 
-    // ✅ STEP 6: Smart Dynamic Shipping Filter (Bypasses 504 Timeout)
     const stripeSupportedShipping = ['US', 'CA', 'GB', 'AU', 'NZ', 'DE', 'FR', 'NL', 'AT', 'BE', 'PL', 'PT', 'IT', 'ES', 'IE'];
 
     if (stripeSupportedShipping.includes(country)) {
@@ -120,7 +120,6 @@ module.exports = async (req, res) => {
         allowed_countries: [country]
       };
     } else {
-      // Agar India/Pakistan jaisi unsupported country hai, toh safe array mix pass karo taake API freeze na ho
       sessionConfig.shipping_address_collection = {
         allowed_countries: [country, 'US', 'GB', 'DE'].filter(c => c === country || stripeSupportedShipping.includes(c)).slice(0, 25)
       };
