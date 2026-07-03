@@ -1,6 +1,6 @@
 const axios = require('axios');
 const crypto = require('crypto');
-const getRawBody = require('raw-body'); // 🔥 FIX: Isko sabse upar move kar diya hai
+const getRawBody = require('raw-body'); // ✅ Sabse upar perfectly imported
 
 // Vercel ke variables ke mutabiq strict binding
 const stripeSecret = process.env.STRIPE_SECRET || process.env.STRIPE_SECRET_KEY;
@@ -40,7 +40,7 @@ module.exports = async (req, res) => {
     );
   } catch (err) {
     console.error("❌ Webhook Signature Error:", err.message);
-    // Isko 200 de rahe hain taake Stripe baar baar fail na kare, par log error karega
+    // Isko 200 de rahe hain taake Stripe baar baar fail na kare
     return res.status(200).send(`Webhook Error Handled: ${err.message}`);
   }
  
