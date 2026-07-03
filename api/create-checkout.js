@@ -1,12 +1,13 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+// 🔥 Aapke Vercel environment variable (STRIPE_SECRET) ke mutabiq name update kar diya hai
+const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 export default async (req, res) => {
-  // 🔥 1. CORS Headers Apply Karen (Cross-Origin Block Fix)
+  // CORS Headers Apply Karen (Cross-Origin Block Fix)
   res.setHeader('Access-Control-Allow-Origin', '*'); 
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // 🔥 2. Preflight Browser Request (OPTIONS) Handle Karen
+  // Preflight Browser Request (OPTIONS) Handle Karen
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -64,7 +65,7 @@ export default async (req, res) => {
       methods.push('ideal', 'bancontact');
     }
 
-    // ✅ Create Stripe Session Config (With Tracking Payload)
+    // Create Stripe Session Config (With Tracking Payload)
     const sessionConfig = {
       payment_method_types: methods,
       billing_address_collection: 'required',
@@ -88,7 +89,7 @@ export default async (req, res) => {
       cancel_url: `https://www.lonovos.com/`
     };
 
-    // ✅ Smart Dynamic Shipping Filter
+    // Smart Dynamic Shipping Filter
     const stripeSupportedShipping = ['US', 'CA', 'GB', 'AU', 'NZ', 'DE', 'FR', 'NL', 'AT', 'BE', 'PL', 'PT', 'IT', 'ES', 'IE', 'DK', 'SE'];
     
     if (stripeSupportedShipping.includes(country)) {
