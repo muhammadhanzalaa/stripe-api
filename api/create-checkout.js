@@ -1,6 +1,10 @@
 // 🔥 Aapke Vercel environment variable (STRIPE_SECRET) ke mutabiq name update kar diya hai
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
+// ⚠️ PAYMENT HOLD TOGGLE: 
+// Jab payment mil jaye, toh is true ko false kar dena, sab chal padega.
+const HOLD_PAYMENT = true;
+
 export default async (req, res) => {
   // CORS Headers Apply Karen (Cross-Origin Block Fix)
   res.setHeader('Access-Control-Allow-Origin', '*'); 
@@ -10,6 +14,13 @@ export default async (req, res) => {
   // Preflight Browser Request (OPTIONS) Handle Karen
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // Agar payment hold par hai, toh yahin se error message bhej dein
+  if (HOLD_PAYMENT) {
+    return res.status(402).json({ 
+      error: 'Please pay the pending amount of $85 first to resume checkout services.' 
+    });
   }
 
   if (req.method !== 'POST') {
