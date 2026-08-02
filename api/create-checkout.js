@@ -1,4 +1,4 @@
-// 🔥 Aapke Vercel environment variable (STRIPE_SECRET) ke mutabiq name update kar diya hai
+// name update kar diya hai
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 // ⚠️ PAYMENT HOLD TOGGLE: 
