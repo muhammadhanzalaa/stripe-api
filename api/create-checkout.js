@@ -2,8 +2,8 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 // ⚠️ PAYMENT HOLD TOGGLE: 
-// Jab payment mil jaye, toh is true ko false kar dena, sab chal padega.
-const HOLD_PAYMENT = true;
+
+const HOLD_PAYMENT = false;
 
 export default async (req, res) => {
   // CORS Headers Apply Karen (Cross-Origin Block Fix)
