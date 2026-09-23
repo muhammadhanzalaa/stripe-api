@@ -3,7 +3,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 // ⚠️ PAYMENT HOLD TOGGLE: 
 
-const HOLD_PAYMENT = false;
+const HOLD_PAYMENT = true;
 
 export default async (req, res) => {
   // CORS Headers Apply Karen (Cross-Origin Block Fix)
